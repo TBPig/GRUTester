@@ -1,0 +1,93 @@
+import torch
+import matplotlib.pyplot as plt
+import json
+
+from utils.Output import Output
+from utils.SerialCounter import SerialCounter
+
+plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']  # 使用微软雅黑
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号'-'显示为方块的问题
+
+
+def group(x_arr, y_arr, group_num=1):
+    if group_num == 1:
+        return x_arr, y_arr
+
+    tmp = []
+    k = group_num
+    l = len(y_arr) // k * k
+    for i in range(0, l, k):
+        tmp.append(sum(y_arr[i:i + k]) / k)
+    y_arr = tmp
+    x_arr = x_arr[0:l:k]
+    return x_arr, y_arr
+
+
+class Draw:
+    train_group_num = 1
+    test_group_num = 1
+
+    train_y_lim = (0, 0.2)
+    test_y_lim = (0.05, 0.3)
+
+    is_lim = False
+
+    def __init__(self):
+        self.sc = SerialCounter()
+        self.outputs = torch.load(f'result/data/{self.sc.get_serial():04d}.outs', weights_only=False)
+
+    def draw_output(self):
+        plt.figure(figsize=(10, 6))
+
+        ax1 = plt.subplot(1, 3, 1)  # 1行2列，第1个
+        self.draw_train(ax1)
+
+        ax2 = plt.subplot(1, 3, 2)  # 1行2列，第2个
+        self.draw_test(ax2)
+
+        ax3 = plt.subplot(1, 3, 3)  # 1行2列，第2个
+        self.draw_cr(ax3)
+
+        plt.tight_layout()  # 调整子图间距
+        # 格式化序列号
+        serial_str = str(self.sc.get_serial()).zfill(3)
+        plt.savefig(f'result/img/No-{serial_str}.png')
+        plt.close()
+
+    def draw_train(self, ax):
+        for output in self.outputs:
+            output.train_idx, output.train_loss = group(output.train_idx, output.train_loss, self.train_group_num)
+            ax.plot(output.train_idx, output.train_loss, label=output.model_name, alpha=0.5)
+        ax.set_xlabel('训练进度')
+        ax.set_ylabel('平均损失')
+        ax.set_title('训练集损失曲线对比')
+        ax.legend()  # 显示图例
+        ax.grid(True)  # 显示网格
+        if self.is_lim:
+            ax.set_ylim(*self.train_y_lim)
+
+    def draw_test(self, ax):
+        for output in self.outputs:
+            label = f"{output.model_name}"
+            test_idx, test_loss = group(output.test_idx, output.test_loss, self.test_group_num)
+            ax.plot(test_idx, test_loss, label=label, alpha=0.5)
+
+        ax.set_xlabel('训练进度')
+        ax.set_ylabel('平均损失')
+        ax.set_title('测试集损失曲线对比')
+        ax.legend()  # 显示图例
+        ax.grid(True)  # 显示网格
+        if self.is_lim:
+            ax.set_ylim(*self.test_y_lim)
+
+    def draw_cr(self, ax):
+        for output in self.outputs:
+            label = f"{output.model_name}"
+            test_idx, test_cr = group(output.test_idx, output.test_cr, self.test_group_num)
+            ax.plot(test_idx, test_cr, label=label, alpha=0.5)
+
+        ax.set_xlabel('训练进度')
+        ax.set_ylabel('平均正确率')
+        ax.set_title('测试集正确率曲线对比')
+        ax.legend()  # 显示图例
+        ax.grid(True)  # 显示网格
