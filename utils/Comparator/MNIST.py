@@ -11,6 +11,7 @@ from utils.Output import Output
 from utils.SerialCounter import SerialCounter
 from utils.Model import Model
 from utils.MPL import mpl
+from utils.Comparator.Basic import BasicComparator
 
 
 class GRU(Model):
@@ -53,7 +54,7 @@ class GRU(Model):
             hidden = (1 - z_t) * hidden + z_t * h_tilde  # 新隐藏状态
             outputs.append(hidden)
 
-        outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_size)
+        outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_dim)
 
         return outputs, hidden
 
@@ -80,7 +81,7 @@ class TorchGRU(Model):
 
 
     def forward(self, x, hidden=None):
-        gru_out, hidden = self.gru(x, hidden)  # gru_out: (batch, seq_len, hidden_size)
+        gru_out, hidden = self.gru(x, hidden)  # gru_out: (batch, seq_len, hidden_dim)
 
         return gru_out, hidden
 
@@ -121,7 +122,7 @@ class HGRU(Model):
             hidden = (1 - z_t) * hidden + z_t * h_tilde  # 新隐藏状态
             outputs.append(hidden)
 
-        outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_size)
+        outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_dim)
         outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
 
         return outputs, hidden
@@ -249,62 +250,28 @@ class MNISTTester:
         return epoch + (batch + 1) / self.batches_num
 
 
-class MNISTComparer:
+class MNISTComparer(BasicComparator):
     file_name = "data"
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
 
     def __init__(self, models_func):
-        sc = SerialCounter()
-        self.serial = sc.new_serial()
-        self.outputs = []
+        super().__init__()
         self.models = self._get_models(models_func)
 
     def _get_models(self, models_func):
         return models_func(28,64,10)
 
     def run(self, epoch_num):
+        self.epoch_num = epoch_num
         for model in tqdm(self.models, desc="Module List"):
             t = MNISTTester(model)
             t.run(epoch_num)
             self.outputs.append(t.output)
-        self._save_test_text()
-        self._save_output()
+        self._save_test_text(self._get_dataset_name())
+        self._save_output(f'result/{self.file_name}')
 
     def _get_dataset_name(self):
         return "MNIST"
-
-    def _save_test_text(self):
-        current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        # 生成要保存的信息
-        info = f"\n\n=== 测试时间: {current_time} ===\n"
-        info += f"测试序号:{self.serial}\n"
-        # 添加超参数信息（从第一个输出中获取，因为测试信息相同）
-        info += "超参数信息：\n"
-        for key, value in self.outputs[0].test_info.items():
-            info += f"{key} = {value}\t"
-        # 添加数据集信息
-        info += "\n数据集信息：\n"
-        info += f"数据名{self._get_dataset_name()}"
-        # 添加每个模型的名称和信息
-        info += "\n模型信息：\n"
-        for output in self.outputs:
-            info += output.model_info + ', ' + str(round(output.consume_time, 2)) + "秒\n"
-
-        # 追加写入文件
-        with open("result/test_result.txt", "a", encoding="utf-8") as f:
-            f.write(info)
-
-    def _save_output(self):
-        """保存 outputs 列表到文件
-        此函数将 self.outputs 列表保存到指定路径的文件中，使用 torch.save 方法。
-        """
-        # 检查目录是否存在，如果不存在则创建
-        if not os.path.exists(f'result/{self.file_name}'):
-            os.makedirs(f'result/{self.file_name}')
-
-        # 构建文件路径
-        filename = f'result/{self.file_name}/{self.serial:04d}.outs'
-        # 使用torch.save保存整个outputs列表
-        torch.save(self.outputs, filename)
 
     def load_data(self):
         """从指定的文件路径加载保存的Outputs列表"""

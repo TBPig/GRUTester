@@ -1,3 +1,5 @@
+import os
+
 import torch
 import matplotlib.pyplot as plt
 import json
@@ -24,6 +26,7 @@ def group(x_arr, y_arr, group_num=1):
 
 
 class Draw:
+    path = 'result/img'
     train_group_num = 1
     test_group_num = 1
 
@@ -51,8 +54,17 @@ class Draw:
         plt.tight_layout()  # 调整子图间距
         # 格式化序列号
         serial_str = str(self.sc.get_serial()).zfill(3)
-        plt.savefig(f'result/img/No-{serial_str}.png')
+        plt.savefig(f'{Draw.path}/No-{serial_str}.png')
         plt.close()
+
+        # 获取所有保存的文件并按修改时间排序
+        files = [os.path.join(Draw.path, f) for f in os.listdir(Draw.path) if f.endswith('.outs')]
+        files.sort(key=lambda x: os.path.getmtime(x))
+
+        # 删除多余的文件，只保留最近的7个
+        if len(files) > 7:
+            for file_to_remove in files[:-7]:
+                os.remove(file_to_remove)
 
     def draw_train(self, ax):
         for output in self.outputs:

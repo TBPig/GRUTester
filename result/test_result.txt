@@ -18,3 +18,57 @@ epoch_num = 1	lr = 1	batch_size = 20
 数据名PTB
 模型信息：
 模型TorchGRU:hidden_size=200, 7.6秒
+
+
+=== 测试时间: 2025-09-03 21:22:59 ===
+测试序号:3
+超参数信息：
+epoch_num = 2	lr = 1	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型TorchGRU:hidden_size=200, 14.34秒
+模型localGRU:hidden_size=200, 97.86秒
+模型HGRU:hidden_size=200,MPL=[2,300], 121.01秒
+模型normGRU:hidden_size=200, 65.19秒
+模型normHGRU:hidden_size=200,MPL_info=[2,300], 88.24秒
+
+
+=== 测试时间: 2025-09-03 21:37:51 ===
+测试序号:1
+超参数信息：
+epoch_num = 2	lr = 1	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型TorchGRU:hidden_size=200, 13.66秒
+
+
+=== 测试时间: 2025-09-03 21:41:15 ===
+测试序号:2
+超参数信息：
+epoch_num = 2	lr = 1	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型TorchGRU:hidden_size=200, 13.97秒
+
+
+=== 测试时间: 2025-09-03 21:43:25 ===
+测试序号:3
+超参数信息：
+epoch_num = 2	lr = 1	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型TorchGRU:hidden_size=200, 13.84秒
+
+
+=== 测试时间: 2025-09-03 21:46:01 ===
+测试序号:4
+超参数信息：
+epoch_num = 2	lr = 1	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型TorchGRU:hidden_size=200, 14.0秒

@@ -9,7 +9,7 @@ flag = True
 if flag:
     print(f"cuda:{torch.cuda.is_available()}")
     c = PTBComparer()
-    c.run(1)
+    c.run()
     d = Draw()
     d.draw_output()
 else:
