@@ -8,3 +8,13 @@ epoch_num = 1	lr = 1	batch_size = 20
 数据名PTB
 模型信息：
 模型TorchGRU:hidden_size=200, 7.79秒
+
+
+=== 测试时间: 2025-09-02 17:18:30 ===
+测试序号:2
+超参数信息：
+epoch_num = 1	lr = 1	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型TorchGRU:hidden_size=200, 7.6秒

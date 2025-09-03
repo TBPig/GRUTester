@@ -146,6 +146,8 @@ class PTBDataset(Dataset):
         # 这里我们假设数据长度合适
         return torch.tensor(inputs, dtype=torch.long), torch.tensor(targets, dtype=torch.long)
 
+class Info:
+    INIT_RANGE = 0.1
 
 class GRU(Model):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.5):
@@ -164,15 +166,14 @@ class GRU(Model):
         self.init_weights()
 
     def init_weights(self):
-        init_range = 0.1
         for linear in [self.r, self.z, self.h]:
             nn.init.xavier_uniform_(linear.weight, gain=1.0)
             nn.init.zeros_(linear.bias)
 
         nn.init.constant_(self.r.bias, -3.0)
         nn.init.zeros_(self.fc.bias)
-        nn.init.uniform_(self.fc.weight, -init_range, init_range)
-        nn.init.uniform_(self.embedding.weight, -init_range, init_range)
+        nn.init.uniform_(self.fc.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
+        nn.init.uniform_(self.embedding.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
 
     def forward(self, x, hidden):
         x = self.dropout(self.embedding(x))
@@ -202,9 +203,11 @@ class GRU(Model):
 
     def init_hidden(self, batch_size, device) -> torch.Tensor:
         # (num_layers, batch, hidden_dim)
-        h = torch.zeros(batch_size, self.hidden_size).to(device)
-        h[:, 0] = 1
+        h = torch.zeros(batch_size, self.hidden_size, device=device)
+        if self.hidden_size > 0:
+            h[:, 0] = 1
         return h
+
 
 class TorchGRU(Model):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.5):
@@ -221,10 +224,9 @@ class TorchGRU(Model):
         self.init_weights()
 
     def init_weights(self):
-        init_range = 0.1
-        nn.init.uniform_(self.embedding.weight, -init_range, init_range)
+        nn.init.uniform_(self.embedding.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
         nn.init.zeros_(self.fc.bias)
-        nn.init.uniform_(self.fc.weight, -init_range, init_range)
+        nn.init.uniform_(self.fc.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
 
     def forward(self, inputs, hidden):
         embedded = self.dropout(self.embedding(inputs))
@@ -240,8 +242,9 @@ class TorchGRU(Model):
 
     def init_hidden(self, batch_size, device) -> torch.Tensor:
         # (num_layers, batch, hidden_dim)
-        h = torch.zeros(self.num_layers, batch_size, self.hidden_dim).to(device)
-        h[:, 0] = 1
+        h = torch.zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
+        if self.hidden_dim > 0:
+            h[:, 0] = 1
         return h
 
 
@@ -260,12 +263,11 @@ class NormGRU(Model):
         self.init_weights()
 
     def init_weights(self):
-        init_range = 0.1
         nn.init.xavier_uniform_(self.h.weight, gain=1.0)
         nn.init.zeros_(self.h.bias)
         nn.init.zeros_(self.fc.bias)
-        nn.init.uniform_(self.fc.weight, -init_range, init_range)
-        nn.init.uniform_(self.embedding.weight, -init_range, init_range)
+        nn.init.uniform_(self.fc.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
+        nn.init.uniform_(self.embedding.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
 
     def forward(self, x, hidden):
         x = self.dropout(self.embedding(x))
@@ -293,8 +295,9 @@ class NormGRU(Model):
 
     def init_hidden(self, batch_size, device) -> torch.Tensor:
         # (num_layers, batch, hidden_dim)
-        h = torch.zeros(batch_size, self.hidden_size).to(device)
-        h[:, 0] = 1
+        h = torch.zeros(batch_size, self.hidden_size, device=device)
+        if self.hidden_size > 0:
+            h[:, 0] = 1
         return h
 
 
@@ -317,15 +320,14 @@ class HGRU(Model):
         self.init_weights()
 
     def init_weights(self):
-        init_range = 0.1
         for linear in [self.r, self.z]:
             nn.init.xavier_uniform_(linear.weight, gain=1.0)
             nn.init.zeros_(linear.bias)
 
         nn.init.constant_(self.r.bias, -3.0)
         nn.init.zeros_(self.fc.bias)
-        nn.init.uniform_(self.fc.weight, -init_range, init_range)
-        nn.init.uniform_(self.embedding.weight, -init_range, init_range)
+        nn.init.uniform_(self.fc.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
+        nn.init.uniform_(self.embedding.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
 
     def forward(self, x, hidden):
         x = self.dropout(self.embedding(x))
@@ -355,8 +357,9 @@ class HGRU(Model):
 
     def init_hidden(self, batch_size, device) -> torch.Tensor:
         # (num_layers, batch, hidden_dim)
-        h = torch.zeros(batch_size, self.hidden_size).to(device)
-        h[:, 0] = 1
+        h = torch.zeros(batch_size, self.hidden_size, device=device)
+        if self.hidden_size > 0:
+            h[:, 0] = 1
         return h
 
 
@@ -377,10 +380,9 @@ class NormHGRU(Model):
         self.init_weights()
 
     def init_weights(self):
-        init_range = 0.1
         nn.init.zeros_(self.fc.bias)
-        nn.init.uniform_(self.fc.weight, -init_range, init_range)
-        nn.init.uniform_(self.embedding.weight, -init_range, init_range)
+        nn.init.uniform_(self.fc.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
+        nn.init.uniform_(self.embedding.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
 
     def forward(self, x, hidden):
         x = self.dropout(self.embedding(x))
@@ -408,9 +410,9 @@ class NormHGRU(Model):
 
     def init_hidden(self, batch_size, device) -> torch.Tensor:
         h = torch.zeros(batch_size, self.hidden_size, device=device)
-        h[:, 0] = 1
+        if self.hidden_size > 0:
+            h[:, 0] = 1
         return h
-
 
 def repackage_hidden(h):
     """将隐藏状态从计算图中分离，以防止反向传播穿过整个训练历史。
