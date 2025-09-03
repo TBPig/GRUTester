@@ -9,9 +9,8 @@ from tqdm import tqdm
 
 from utils.Output import Output
 from utils.SerialCounter import SerialCounter
-from utils.Model import Model
 from utils.MPL import mpl
-from utils.Comparator.Basic import BasicComparator
+from utils.Comparator.Basic import BasicComparator, Model
 
 
 class GRU(Model):
@@ -61,6 +60,7 @@ class GRU(Model):
     def get_info(self):
         return f"模型{self.name}:hidden_size={self.hidden_size}"
 
+
 class TorchGRU(Model):
     def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers=1, batch_first=True):
         super().__init__()
@@ -79,7 +79,6 @@ class TorchGRU(Model):
             batch_first=batch_first
         )
 
-
     def forward(self, x, hidden=None):
         gru_out, hidden = self.gru(x, hidden)  # gru_out: (batch, seq_len, hidden_dim)
 
@@ -87,6 +86,7 @@ class TorchGRU(Model):
 
     def get_info(self):
         return f"模型{self.name}:hidden_size={self.hidden_size}"
+
 
 class HGRU(Model):
     def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layer=2, MLP_hidden_size=144):
@@ -131,49 +131,34 @@ class HGRU(Model):
         return f"模型{self.name}:hidden_size={self.hidden_size},MPL_size=[{self.num_layer},{self.MLP_hidden_size}]"
 
 
-
 class MNISTTester:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
     dataset_root = './data'
     train_write_steps = 0.5
     test_write_steps = 1
 
+    batch_size = 100
+    train_dataset = torchvision.datasets.MNIST(root=dataset_root, transform=transforms.ToTensor(), download=True)
+    test_dataset = torchvision.datasets.MNIST(root=dataset_root, transform=transforms.ToTensor(), train=False)
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)  # 训练时打乱数据
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)  # 测试时不需要打乱
 
+    learning_rate = 0.001
+    batches_num = len(train_loader)
 
     def __init__(self, model):
         # 超参数
-        self.learning_rate = 0.001
-        self.batch_size = 100
-        self._set_loader()
-        self.batches_num = len(self.train_loader)
-        self._set_model(model)
-        self.output = Output()
-
-    def _set_model(self, model):
         self.model = model.to(self.device)
         # 损失函数与优化器
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
-
-    def _set_loader(self):
-        dataset_func = self._get_dataset_func()
-        train_dataset = dataset_func(root=self.dataset_root, train=True, transform=transforms.ToTensor(),
-                                     download=True)
-        test_dataset = dataset_func(root=self.dataset_root, train=False, transform=transforms.ToTensor())
-        self.train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=self.batch_size,
-                                                        shuffle=True)  # 训练时打乱数据
-        self.test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=self.batch_size,
-                                                       shuffle=False)  # 测试时不需要打乱
-
-    def _get_dataset_func(self):
-        return torchvision.datasets.MNIST
+        self.output = Output()
 
     def run(self, epoch_num):
         # 开始计时
         start_time = time.perf_counter()
 
         train_loss_sum = 0
-        cr = 0
 
         for i in tqdm(range(epoch_num), desc='Train', colour='white', leave=False):
             for j, (images, labels) in enumerate(self.train_loader):
@@ -202,7 +187,7 @@ class MNISTTester:
          )
 
     def _train(self, input_data, labels):
-        input_data = self._reshape(input_data).to(self.device)  # 输入大小=28:每行28像素；序列长度=28:28行
+        input_data = input_data.reshape(-1, 28, 28).to(self.device)  # 输入大小=28:每行28像素；序列长度=28:28行
         labels = labels.to(self.device)
 
         # 前向计算
@@ -224,7 +209,7 @@ class MNISTTester:
             test_losses = 0
             for input_data, labels in self.test_loader:
                 # 同样重塑测试图像为 [N, 28, 28]
-                input_data = self._reshape(input_data).to(self.device)  # 输入大小=28:每行28像素；序列长度=28:28行
+                input_data = input_data.reshape(-1, 28, 28).to(self.device)  # 输入大小=28:每行28像素；序列长度=28:28行
                 labels = labels.to(self.device)
                 # 前向计算
                 outputs, _ = self.model(input_data)
@@ -239,9 +224,6 @@ class MNISTTester:
             loss = test_losses / len(self.test_loader)
             return correct_rate, loss
 
-    def _reshape(self, indata):
-        return indata.reshape(-1, 28, 28)
-
     def _is_write_time(self, epoch: int, batch: int, steps: float) -> bool:
         s = self._get_x(epoch, batch)
         return s % steps == 0
@@ -254,24 +236,22 @@ class MNISTComparer(BasicComparator):
     file_name = "data"
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
 
-    def __init__(self, models_func):
+    input_dim = 28
+    hidden_dim = 128
+    output_dim = 10
+
+    def __init__(self):
         super().__init__()
-        self.models = self._get_models(models_func)
+        self.models = [GRU(28, 28, 10)]
+        self.epoch_num = 3
 
-    def _get_models(self, models_func):
-        return models_func(28,64,10)
-
-    def run(self, epoch_num):
-        self.epoch_num = epoch_num
+    def run(self):
         for model in tqdm(self.models, desc="Module List"):
             t = MNISTTester(model)
-            t.run(epoch_num)
+            t.run(self.epoch_num)
             self.outputs.append(t.output)
-        self._save_test_text(self._get_dataset_name())
+        self._save_test_text("MNIST")
         self._save_output(f'result/{self.file_name}')
-
-    def _get_dataset_name(self):
-        return "MNIST"
 
     def load_data(self):
         """从指定的文件路径加载保存的Outputs列表"""

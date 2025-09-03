@@ -32,9 +32,8 @@ from tqdm import tqdm
 
 from utils.Output import Output
 from utils.SerialCounter import SerialCounter
-from utils.Model import Model
 from utils.MPL import mpl
-from utils.Comparator.Basic import BasicComparator
+from utils.Comparator.Basic import BasicComparator, Model
 
 
 # --- 1. 数据加载与预处理 ---

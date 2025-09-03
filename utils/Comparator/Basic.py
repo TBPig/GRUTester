@@ -3,6 +3,7 @@ import time
 from abc import ABC, abstractmethod
 
 import torch
+from torch import nn as nn
 from tqdm import tqdm
 
 from utils.Output import Output
@@ -71,3 +72,16 @@ class BasicComparator(ABC):
         if len(files) > 3:
             for file_to_remove in files[:-3]:
                 os.remove(file_to_remove)
+
+
+class Model(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.name = 'model'
+
+    def set_name(self, name):
+        self.name = name
+        return self
+
+    def get_info(self):
+        return f"模型{self.name}"
