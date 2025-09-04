@@ -1,4 +1,3 @@
-import os
 import time
 
 import torch
@@ -8,118 +7,69 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 
 from utils.Output import Output
-from utils.SerialCounter import SerialCounter
 from utils.MPL import mpl
 from utils.Comparator.Basic import BasicComparator, Model
 
 
-class GRU(Model):
-    def __init__(self, input_size: int, hidden_size: int, output_size=None):
+class BasicModule(Model):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int):
         super().__init__()
-        self.name = "localGRU"
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.output_size = output_size if output_size else hidden_size
+        self.output_size = output_size
+
+        # 添加输出层
+        self.fc = nn.Linear(hidden_size, self.output_size)
+
+    def init_weights(self):
+        init_range = 0.1
+        nn.init.uniform_(self.fc.weight, -init_range, init_range)
+        nn.init.zeros_(self.fc.bias)
+
+    def _init_hidden(self, batch_size, device, dtype):
+        """初始化隐藏状态"""
+        return torch.zeros(batch_size, self.hidden_size, device=device, dtype=dtype)
+
+    def get_info(self):
+        return f"模型{self.name}:hidden_size={self.hidden_size}"
+
+
+class GRU(BasicModule):
+    def __init__(self, input_size: int, hidden_size: int, output_size:int):
+        super().__init__(input_size, hidden_size, output_size )
+        self.name = "localGRU"
 
         self.r = nn.Linear(input_size + hidden_size, hidden_size)
         self.z = nn.Linear(input_size + hidden_size, hidden_size)
         self.h = nn.Linear(input_size + hidden_size, hidden_size)
+        # 添加输出层
         self.init_weights()
 
     def init_weights(self):
-        init_range = 0.1
-        for linear in [self.r, self.z, self.h, self.fc]:
+        super().init_weights()
+        for linear in [self.r, self.z, self.h]:
             nn.init.xavier_uniform_(linear.weight, gain=1.0)
             nn.init.zeros_(linear.bias)
-
-        nn.init.constant_(self.r.bias, -3.0)  # 常见选择：-1 ~ -3
-        nn.init.uniform_(self.fc.weight, -init_range, init_range)
+        nn.init.constant_(self.r.bias, -1.0)  # 使用更温和的初始化值
 
     def forward(self, x, hidden=None):
         batch_size, seq_len, _ = x.size()
+        # 初始化隐藏状态
         if hidden is None:
-            hidden = torch.zeros(batch_size, self.hidden_size, device=x.device)
+            hidden = self._init_hidden(batch_size, x.device, x.dtype)
 
         outputs = []
         for t in range(seq_len):
             x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
-            combined = torch.cat((x_t, hidden), 1)
 
-            r_t = torch.sigmoid(self.r(combined))  # 重置门
-            z_t = torch.sigmoid(self.z(combined))  # 更新门
-            k = r_t * hidden
-            kx_combined = torch.cat((x_t, k), 1)
-            h_tilde = torch.tanh(self.h(kx_combined))  # 候选状态
-            hidden = (1 - z_t) * hidden + z_t * h_tilde  # 新隐藏状态
-            outputs.append(hidden)
+            reset_update_input = torch.cat((x_t, hidden), dim=1)
+            r = torch.sigmoid(self.r(reset_update_input))  # 重置门 r_t
+            z = torch.sigmoid(self.z(reset_update_input))  # 更新门 z_t
+            combine = torch.cat((x_t, r * hidden), dim=1)
+            h_title = torch.tanh(self.h(combine))  # 候选状态 h_tilde
 
-        outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_dim)
-
-        return outputs, hidden
-
-    def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_size}"
-
-
-class TorchGRU(Model):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers=1, batch_first=True):
-        super().__init__()
-        self.name = "TorchGRU"
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-        self.num_layers = num_layers
-        self.batch_first = batch_first
-
-        # 使用 PyTorch 的 GRU 层
-        self.gru = nn.GRU(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=batch_first
-        )
-
-    def forward(self, x, hidden=None):
-        gru_out, hidden = self.gru(x, hidden)  # gru_out: (batch, seq_len, hidden_dim)
-
-        return gru_out, hidden
-
-    def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_size}"
-
-
-class HGRU(Model):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layer=2, MLP_hidden_size=144):
-        super().__init__()
-        self.name = "HGRU"
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-        self.num_layer = num_layer
-        self.MLP_hidden_size = MLP_hidden_size
-
-        self.r = nn.Linear(input_size + hidden_size, hidden_size)
-        self.z = nn.Linear(input_size + hidden_size, hidden_size)
-        self.h = mpl(input_size + hidden_size, hidden_size, num_layer, MLP_hidden_size)
-        # 输出层（可选）
-        self.fc = nn.Linear(hidden_size, self.output_size)
-
-    def forward(self, x, hidden=None):
-        batch_size, seq_len, _ = x.size()
-        if hidden is None:
-            hidden = torch.zeros(batch_size, self.hidden_size, device=x.device)
-
-        outputs = []
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
-            combined = torch.cat((x_t, hidden), 1)
-
-            r_t = torch.sigmoid(self.r(combined))  # 重置门
-            z_t = torch.sigmoid(self.z(combined))  # 更新门
-            k = r_t * hidden
-            kx_combined = torch.cat((x_t, k), 1)
-            h_tilde = torch.tanh(self.h(kx_combined))  # 候选状态
-            hidden = (1 - z_t) * hidden + z_t * h_tilde  # 新隐藏状态
+            # 更新隐藏状态
+            hidden = (1 - z) * hidden + z * h_title
             outputs.append(hidden)
 
         outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_dim)
@@ -127,8 +77,61 @@ class HGRU(Model):
 
         return outputs, hidden
 
-    def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_size},MPL_size=[{self.num_layer},{self.MLP_hidden_size}]"
+
+class TorchGRU(BasicModule):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers=1, batch_first=True):
+        super().__init__(input_size, hidden_size, output_size)
+        self.name = "TorchGRU"
+        # 使用 PyTorch 的 GRU 层
+        self.gru = nn.GRU(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=batch_first
+        )
+        self.init_weights()
+
+    def forward(self, x, hidden=None):
+        gru_out, hidden = self.gru(x, hidden)  # gru_out: (batch, seq_len, hidden_dim)
+        # 应用输出层
+        outputs = self.fc(gru_out)  # (batch_size, seq_len, output_size)
+        return outputs, hidden
+
+
+class HGRU(BasicModule):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, mpl_n=2, mpl_h=144):
+        super().__init__(input_size, hidden_size, output_size)
+        self.name = "HGRU"
+        self.mpl_n = mpl_n
+        self.mpl_h = mpl_h
+
+        self.r = nn.Linear(input_size + hidden_size, hidden_size)
+        self.z = nn.Linear(input_size + hidden_size, hidden_size)
+        self.h = mpl(input_size + hidden_size, hidden_size, mpl_n, mpl_h)
+
+        self.init_weights()
+
+    def forward(self, x, hidden=None):
+        batch_size, seq_len, _ = x.size()
+        if hidden is None:
+            hidden = self._init_hidden(batch_size, x.device, x.dtype)
+
+        outputs = []
+        for t in range(seq_len):
+            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
+            combined = torch.cat((x_t, hidden), 1)
+
+            r = torch.sigmoid(self.r(combined))  # 重置门
+            z = torch.sigmoid(self.z(combined))  # 更新门
+            kx_combined = torch.cat((x_t, r * hidden), 1)
+            h_tilde = torch.tanh(self.h(kx_combined))  # 候选状态
+            hidden = (1 - z) * hidden + z * h_tilde  # 新隐藏状态
+            outputs.append(hidden)
+
+        outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_dim)
+        outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
+
+        return outputs, hidden
 
 
 class MNISTTester:
@@ -136,8 +139,8 @@ class MNISTTester:
     dataset_root = './data'
     train_write_steps = 0.5
     test_write_steps = 1
-
     batch_size = 100
+
     train_dataset = torchvision.datasets.MNIST(root=dataset_root, transform=transforms.ToTensor(), download=True)
     test_dataset = torchvision.datasets.MNIST(root=dataset_root, transform=transforms.ToTensor(), train=False)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)  # 训练时打乱数据
@@ -154,6 +157,10 @@ class MNISTTester:
         self.optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
         self.output = Output()
 
+    def _prepare_data(self, input_data):
+        """统一的数据预处理方法"""
+        return input_data.reshape(-1, 28, 28).to(self.device)  # 输入大小=28:每行28像素；序列长度=28:28行
+
     def run(self, epoch_num):
         # 开始计时
         start_time = time.perf_counter()
@@ -165,17 +172,14 @@ class MNISTTester:
                 loss = self._train(images, labels)
                 train_loss_sum += loss
 
-                # 每隔一段时间，记录时间段内train_loss平均值
-                if self._is_write_time(i, j, self.train_write_steps):
-                    loss = train_loss_sum / (self.train_write_steps * self.batches_num)
-                    self.output.add_train_info(loss, self._get_x(i, j))
-                    train_loss_sum = 0
 
-                # 每隔一段时间，记录时间段内test_loss平均值、正确率
-                if self._is_write_time(i, j, self.test_write_steps):
-                    self._test()
-                    cr, loss = self._test()
-                    self.output.add_test_info(cr, loss, self._get_x(i, j))
+            loss = train_loss_sum / self.batches_num
+            self.output.add_train_info(loss, i+1)
+            train_loss_sum = 0
+
+            self._test()
+            cr, loss = self._test()
+            self.output.add_test_info(cr, loss, i+1)
 
         end_time = time.perf_counter()
         run_time = end_time - start_time
@@ -187,7 +191,7 @@ class MNISTTester:
          )
 
     def _train(self, input_data, labels):
-        input_data = input_data.reshape(-1, 28, 28).to(self.device)  # 输入大小=28:每行28像素；序列长度=28:28行
+        input_data = self._prepare_data(input_data)
         labels = labels.to(self.device)
 
         # 前向计算
@@ -209,7 +213,7 @@ class MNISTTester:
             test_losses = 0
             for input_data, labels in self.test_loader:
                 # 同样重塑测试图像为 [N, 28, 28]
-                input_data = input_data.reshape(-1, 28, 28).to(self.device)  # 输入大小=28:每行28像素；序列长度=28:28行
+                input_data = self._prepare_data(input_data)
                 labels = labels.to(self.device)
                 # 前向计算
                 outputs, _ = self.model(input_data)
@@ -224,13 +228,6 @@ class MNISTTester:
             loss = test_losses / len(self.test_loader)
             return correct_rate, loss
 
-    def _is_write_time(self, epoch: int, batch: int, steps: float) -> bool:
-        s = self._get_x(epoch, batch)
-        return s % steps == 0
-
-    def _get_x(self, epoch, batch):
-        return epoch + (batch + 1) / self.batches_num
-
 
 class MNISTComparer(BasicComparator):
     file_name = "data"
@@ -243,7 +240,7 @@ class MNISTComparer(BasicComparator):
     def __init__(self):
         super().__init__()
         self.models = [GRU(28, 28, 10)]
-        self.epoch_num = 3
+        self.epoch_num = 4
 
     def run(self):
         for model in tqdm(self.models, desc="Module List"):

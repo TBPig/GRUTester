@@ -3,10 +3,8 @@ import time
 from abc import ABC, abstractmethod
 
 import torch
-from torch import nn as nn
-from tqdm import tqdm
+from torch import nn
 
-from utils.Output import Output
 from utils.SerialCounter import SerialCounter
 
 
