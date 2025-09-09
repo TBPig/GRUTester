@@ -82,3 +82,95 @@ epoch_num = 4	lr = 0.001	batch_size = 100
 数据名MNIST
 模型信息：
 模型localGRU:hidden_size=28, 73.56秒
+
+
+=== 测试时间: 2025-09-09 17:17:39 ===
+测试序号:6
+超参数信息：
+epoch_num = 2	lr = 1	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型localGRU:hidden_size=200, 108.38秒
+模型localGRU:hidden_size=400, 106.25秒
+模型localGRU:hidden_size=600, 110.81秒
+模型localGRU:hidden_size=800, 113.39秒
+模型localGRU:hidden_size=1000, 115.84秒
+模型localGRU:hidden_size=1200, 129.3秒
+
+
+=== 测试时间: 2025-09-09 21:10:22 ===
+测试序号:10
+超参数信息：
+sequence_length = 10	vocab_size = 10	embedding_dim = 32	batch_size = 32	epoch_num = 3	
+数据集信息：
+数据名CopyTask
+模型信息：
+模型localGRU:hidden_size=32, 0.3秒
+模型TorchGRU:hidden_size=32, 0.3秒
+
+
+=== 测试时间: 2025-09-09 21:11:38 ===
+测试序号:11
+超参数信息：
+sequence_length = 10	vocab_size = 10	embedding_dim = 32	batch_size = 32	epoch_num = 6	
+数据集信息：
+数据名CopyTask
+模型信息：
+模型localGRU:hidden_size=32, 0.6秒
+模型TorchGRU:hidden_size=32, 0.6秒
+
+
+=== 测试时间: 2025-09-09 21:16:04 ===
+测试序号:12
+超参数信息：
+sequence_length = 10	vocab_size = 10	embedding_dim = 32	batch_size = 32	epoch_num = 6	
+数据集信息：
+数据名CopyTask
+模型信息：
+模型localGRU:hidden_size=32, 13.74秒
+模型TorchGRU:hidden_size=32, 1.46秒
+
+
+=== 测试时间: 2025-09-09 21:21:05 ===
+测试序号:13
+超参数信息：
+sequence_length = 10	vocab_size = 10	embedding_dim = 32	batch_size = 32	epoch_num = 6	
+数据集信息：
+数据名CopyTask
+模型信息：
+模型localGRU:hidden_size=32, 13.93秒
+模型TorchGRU:hidden_size=32, 1.54秒
+
+
+=== 测试时间: 2025-09-09 21:33:19 ===
+测试序号:14
+超参数信息：
+sequence_length = 10	vocab_size = 10	embedding_dim = 32	batch_size = 32	epoch_num = 30	
+数据集信息：
+数据名CopyTask
+模型信息：
+模型localGRU:hidden_size=32, 70.4秒
+模型TorchGRU:hidden_size=32, 7.32秒
+
+
+=== 测试时间: 2025-09-09 21:38:12 ===
+测试序号:15
+超参数信息：
+sequence_length = 10	vocab_size = 10	embedding_dim = 32	batch_size = 32	epoch_num = 30	
+数据集信息：
+数据名CopyTask
+模型信息：
+模型localGRU:hidden_size=32, 67.63秒
+模型TorchGRU:hidden_size=32, 7.19秒
+
+
+=== 测试时间: 2025-09-09 21:40:35 ===
+测试序号:18
+超参数信息：
+sequence_length = 10	vocab_size = 10	embedding_dim = 32	batch_size = 32	epoch_num = 6	
+数据集信息：
+数据名CopyTask
+模型信息：
+模型localGRU:hidden_size=32, 14.01秒
+模型TorchGRU:hidden_size=32, 1.55秒

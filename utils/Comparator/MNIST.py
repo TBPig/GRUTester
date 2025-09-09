@@ -240,7 +240,7 @@ class MNISTComparer(BasicComparator):
     def __init__(self):
         super().__init__()
         self.models = [GRU(28, 28, 10)]
-        self.epoch_num = 4
+        self.epoch_num = 2
 
     def run(self):
         for model in tqdm(self.models, desc="Module List"):

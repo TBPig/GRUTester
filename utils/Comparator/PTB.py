@@ -506,7 +506,11 @@ class PTBComparer(BasicComparator):
     def __init__(self):
         super().__init__()
         self.epoch_num = 2
-        self.inner_models = [TorchGRU(self.vocab_size, self.embedding_dim, self.hidden_dim, dropout=self.dropout)]
+        # 生成不同隐藏层维度的GRU模型测试数组（200-1200）
+        self.inner_models = [
+            GRU(self.vocab_size, self.embedding_dim, hidden_dim, dropout=self.dropout)
+            for hidden_dim in range(200, 1300, 200)  # 200, 400, 600, 800, 1000, 1200
+        ]
         
     def run(self):
         for model in tqdm(self.inner_models, desc="Module List"):

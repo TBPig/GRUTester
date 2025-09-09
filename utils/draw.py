@@ -58,7 +58,7 @@ class Draw:
         plt.close()
 
         # 获取所有保存的文件并按修改时间排序
-        files = [os.path.join(Draw.path, f) for f in os.listdir(Draw.path) if f.endswith('.outs')]
+        files = [os.path.join(Draw.path, f) for f in os.listdir(Draw.path) if f.endswith('.png')]
         files.sort(key=lambda x: os.path.getmtime(x))
 
         # 删除多余的文件，只保留最近的7个
