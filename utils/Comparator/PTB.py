@@ -488,7 +488,7 @@ class PTBComparer(BasicComparator):
     hidden_dim = 200
     num_layers = 2
     dropout = 0.2
-    learning_rate = 1
+    learning_rate = 1e-4
 
     # 数据准备
     extract_path = maybe_download_and_extract(data_path)
@@ -509,7 +509,7 @@ class PTBComparer(BasicComparator):
         # 生成不同隐藏层维度的GRU模型测试数组（200-1200）
         self.inner_models = [
             GRU(self.vocab_size, self.embedding_dim, hidden_dim, dropout=self.dropout)
-            for hidden_dim in range(200, 1300, 200)  # 200, 400, 600, 800, 1000, 1200
+            for hidden_dim in range(200, 300, 200)  # 200, 400, 600, 800, 1000, 1200
         ]
         
     def run(self):
@@ -525,21 +525,9 @@ class PTBComparer(BasicComparator):
         # --- 优化器和损失函数 ---
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(model.parameters(), lr=self.learning_rate)
-        # 学习率调度器：当验证损失停止改善时，降低学习率
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=0)
 
-        for epoch in range(epoch_num):
+        for epoch in tqdm(range(epoch_num)):
             train_loss, train_ppl = train(model, self.train_loader, criterion, optimizer, self.device)
-            val_loss, val_ppl, _ = evaluate(model, self.valid_loader, criterion, self.device)
-
-            scheduler.step(val_loss)
-
-            current_lr = optimizer.param_groups[0]['lr']  # 获取当前学习率
-
-            print(f'Epoch: {epoch:02} | '
-                  f'LR: {current_lr:.5f} | '
-                  f'Train Loss: {train_loss:.4f} | Train PPL: {train_ppl:7.4f} | '
-                  f'Valid Loss: {val_loss:.4f} | Valid PPL: {val_ppl:7.4f}')
             output.add_train_info(train_loss, epoch + 1)
             test_loss, test_ppl, cr = evaluate(model, self.test_loader, criterion, self.device)
             output.add_test_info(cr, test_loss, epoch + 1)
