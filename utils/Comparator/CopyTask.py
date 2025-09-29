@@ -281,10 +281,14 @@ class CopyTaskComparer(BasicComparator):
         self.epoch_num = 2
 
         # 创建模型列表
-        self.models = [
-            GRU(self.vocab_size, self.embedding_dim, self.hidden_dim),
-            TorchGRU(self.vocab_size, self.embedding_dim, self.hidden_dim)
-        ]
+        self.models = None
+
+    def choice(self, idx):
+        if idx == 0:
+            self.models = [
+                GRU(self.vocab_size, self.embedding_dim, self.hidden_dim),
+                TorchGRU(self.vocab_size, self.embedding_dim, self.hidden_dim)
+            ]
 
     def run(self):
         """运行比较测试"""

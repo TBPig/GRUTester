@@ -30,8 +30,8 @@ class Draw:
     train_group_num = 1
     test_group_num = 1
 
-    train_y_lim = (0, 0.04)
-    test_y_lim = (0, 0.08)
+    train_y_lim = (0, 0.05)
+    test_y_lim = (0, 0.1)
 
     is_lim = True
 

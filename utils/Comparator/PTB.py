@@ -506,12 +506,15 @@ class PTBComparer(BasicComparator):
     def __init__(self):
         super().__init__()
         self.epoch_num = 2
-        # 生成不同隐藏层维度的GRU模型测试数组（200-1200）
-        self.inner_models = [
-            GRU(self.vocab_size, self.embedding_dim, hidden_dim, dropout=self.dropout)
-            for hidden_dim in range(200, 300, 200)  # 200, 400, 600, 800, 1000, 1200
-        ]
-        
+        self.inner_models = None
+
+    def choice(self, idx):
+        if idx == 0:
+            self.inner_models = [
+                GRU(self.vocab_size, self.embedding_dim, hidden_dim, dropout=self.dropout)
+                for hidden_dim in range(200, 300, 200)  # 200, 400, 600, 800, 1000, 1200
+            ]
+
     def run(self):
         for model in tqdm(self.inner_models, desc="Module List"):
             model = model.to(self.device)

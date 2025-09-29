@@ -133,6 +133,9 @@ class HGRU(BasicModule):
 
         return outputs, hidden
 
+    def get_info(self):
+        return f"模型{self.name}:hidden_size={self.hidden_size},mpl=[{self.mpl_n},{self.mpl_h}]"
+
 
 class NormGRU(BasicModule):
     def __init__(self, input_size: int, hidden_size: int, output_size: int):
@@ -153,7 +156,7 @@ class NormGRU(BasicModule):
 
         # 预分配outputs张量以提高性能
         outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
-        
+
         for t in range(seq_len):
             x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
             combined = torch.cat((x_t, hidden), 1)
@@ -166,6 +169,38 @@ class NormGRU(BasicModule):
         outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
 
         return outputs, hidden
+
+
+class NormHGRU(BasicModule):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, mpl_n=2, mpl_h=144):
+        super().__init__(input_size, hidden_size, output_size)
+        self.name = "normHGRU"
+        self.mpl_n = mpl_n
+        self.mpl_h = mpl_h
+        self.h = mpl(input_size + hidden_size, hidden_size, mpl_n, mpl_h)
+        self.init_weights()
+
+    def forward(self, x, hidden=None):
+        batch_size, seq_len, _ = x.size()
+        if hidden is None:
+            hidden = self._init_hidden(batch_size, x.device, x.dtype)
+
+        outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
+        for t in range(seq_len):
+            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
+            combined = torch.cat((x_t, hidden), 1)
+            h_tilde = self.h(combined)
+            h = hidden + h_tilde
+            norm = torch.norm(h, dim=1, keepdim=True)
+            hidden = h / norm
+            outputs[:, t, :] = hidden
+
+        outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
+
+        return outputs, hidden
+
+    def get_info(self):
+        return f"模型{self.name}:hidden_size={self.hidden_size},mpl=[{self.mpl_n},{self.mpl_h}]"
 
 
 class MNISTTester:
@@ -272,11 +307,21 @@ class MNISTComparer(BasicComparator):
 
     def __init__(self):
         super().__init__()
-        self.models = [GRU(self.input_dim, self.hidden_dim, self.output_dim)]
-        for a in range(10, 22):
-            i = int(1.5 ** a)
-            self.models.append(HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i).set_name(f"HGRU-{i}"))
+        self.models = None
         self.epoch_num = 25
+
+    def choice(self, idx=0):
+        self.models = [GRU(self.input_dim, self.hidden_dim, self.output_dim)]
+        if idx == 0:
+            for a in range(8, 13):
+                i = int(1.7 ** a)
+                self.models.append(
+                    HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i).set_name(f"HGRU-{i}"))
+        elif idx == 1:
+            for a in range(10, 15):
+                i = int(1.7 ** a)
+                self.models.append(
+                    NormGRU(self.input_dim, i, self.output_dim).set_name(f"normGRU-{i}"))
 
     def run(self):
         for model in tqdm(self.models, desc="Module List"):
@@ -285,4 +330,3 @@ class MNISTComparer(BasicComparator):
             self.outputs.append(t.output)
         self._save_test_text(self.data_name)
         self._save_output()
-

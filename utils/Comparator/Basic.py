@@ -25,6 +25,13 @@ class BasicComparator(ABC):
         """
         pass
 
+    @abstractmethod
+    def choice(self, idx):
+        """
+        选择要使用的模型组
+        """
+        pass
+
     def _save_test_text(self, data_name):
         """
         保存测试文本信息
@@ -67,7 +74,7 @@ class BasicComparator(ABC):
         files.sort(key=lambda x: os.path.getmtime(x))
 
         # 删除多余的文件，只保留最近的3个
-        if len(files) > 3:
+        if len(files) > 7:
             for file_to_remove in files[:-3]:
                 os.remove(file_to_remove)
 
