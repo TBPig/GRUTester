@@ -36,5 +36,6 @@ class SerialCounter:
         except (IOError, OSError) as e:
             # 如果写入失败，回滚serial值
             self.serial -= 1
+            print(f"Failed to write serial to file: {e}")
             raise IOError(f"Failed to write serial to file: {e}")
         return self.serial

@@ -297,3 +297,17 @@ epoch_num = 2	lr = 0.001	batch_size = 100
 模型HGRU-582:hidden_size=640,mpl=[2,582], 43.85秒
 模型HGRU-990:hidden_size=640,mpl=[2,990], 64.13秒
 模型HGRU-1683:hidden_size=640,mpl=[2,1683], 63.01秒
+
+=== 测试时间: 2025-09-29 20:39:26 ===
+测试序号:30
+超参数信息：
+epoch_num = 20	lr = 0.001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型localGRU:hidden_size=640, 425.04秒
+模型HGRU-69:hidden_size=640,mpl=[2,69], 444.41秒
+模型HGRU-118:hidden_size=640,mpl=[2,118], 425.12秒
+模型HGRU-201:hidden_size=640,mpl=[2,201], 448.63秒
+模型HGRU-342:hidden_size=640,mpl=[2,342], 433.29秒
+模型HGRU-582:hidden_size=640,mpl=[2,582], 471.97秒

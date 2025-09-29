@@ -310,12 +310,12 @@ class MNISTComparer(BasicComparator):
     def __init__(self):
         super().__init__()
         self.models = None
-        self.epoch_num = 25
+        self.epoch_num = 40
 
     def choice(self, idx=0):
         self.models = [GRU(self.input_dim, self.hidden_dim, self.output_dim)]
         if idx == 0:
-            for a in range(8, 13):
+            for a in range(9, 14):
                 i = int(1.7 ** a)
                 self.models.append(
                     HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i).set_name(f"HGRU-{i}"))
