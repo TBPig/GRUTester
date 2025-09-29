@@ -30,30 +30,35 @@ class Draw:
     train_group_num = 1
     test_group_num = 1
 
-    train_y_lim = (0, 0.2)
-    test_y_lim = (0.05, 0.3)
+    train_y_lim = (0, 0.04)
+    test_y_lim = (0, 0.08)
 
-    is_lim = False
+    is_lim = True
 
-    def __init__(self):
+    def __init__(self, serial=None):
         self.sc = SerialCounter()
-        self.outputs = torch.load(f'result/data/{self.sc.get_serial():04d}.outs', weights_only=False)
+        # 如果提供了serial参数，则使用该值，否则使用SerialCounter中的当前序号
+        if serial is not None:
+            self.serial = serial
+        else:
+            self.serial = self.sc.get_serial()
+        self.outputs = torch.load(f'result/data/{self.serial:04d}.outs', weights_only=False)
 
     def draw_output(self):
         plt.figure(figsize=(10, 6))
 
-        ax1 = plt.subplot(1, 3, 1)  # 1行2列，第1个
+        ax1 = plt.subplot(1, 3, 1)  # 1行3列，第1个
         self.draw_train(ax1)
 
-        ax2 = plt.subplot(1, 3, 2)  # 1行2列，第2个
+        ax2 = plt.subplot(1, 3, 2)  # 1行3列，第2个
         self.draw_test(ax2)
 
-        ax3 = plt.subplot(1, 3, 3)  # 1行2列，第2个
+        ax3 = plt.subplot(1, 3, 3)  # 1行3列，第3个
         self.draw_cr(ax3)
 
         plt.tight_layout()  # 调整子图间距
         # 格式化序列号
-        serial_str = str(self.sc.get_serial()).zfill(3)
+        serial_str = str(self.serial).zfill(3)
         plt.savefig(f'{Draw.path}/No-{serial_str}.png')
         plt.close()
 

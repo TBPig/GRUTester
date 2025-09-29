@@ -194,3 +194,67 @@ epoch_num = 8	lr = 1	batch_size = 20
 数据名PTB
 模型信息：
 模型localGRU:hidden_size=200, 398.58秒
+
+=== 测试时间: 2025-09-27 19:59:11 ===
+测试序号:8
+超参数信息：
+epoch_num = 8	lr = 0.0001	batch_size = 20
+数据集信息：
+数据名PTB
+模型信息：
+模型localGRU:hidden_size=200, 347.59秒
+
+=== 测试时间: 2025-09-27 20:48:09 ===
+测试序号:24
+超参数信息：
+epoch_num = 2	lr = 0.001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型GRU-32:hidden_size=32, 37.74秒
+模型GRU-64:hidden_size=64, 37.71秒
+模型GRU-128:hidden_size=128, 41.45秒
+模型GRU-256:hidden_size=256, 46.19秒
+模型GRU-512:hidden_size=512, 46.84秒
+模型GRU-1024:hidden_size=1024, 42.95秒
+
+
+=== 测试时间: 2025-09-27 23:36:42 ===
+测试序号:25
+超参数信息：
+epoch_num = 80	lr = 0.001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型GRU-64:hidden_size=64, 801.72秒
+模型GRU-128:hidden_size=128, 891.16秒
+模型GRU-256:hidden_size=256, 1322.31秒
+模型GRU-512:hidden_size=512, 2318.38秒
+模型GRU-1024:hidden_size=1024, 3468.31秒
+
+
+=== 测试时间: 2025-09-28 19:26:56 ===
+测试序号:26
+超参数信息：
+epoch_num = 30	lr = 0.001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型GRU-291:hidden_size=291, 534.9秒
+模型GRU-437:hidden_size=437, 807.44秒
+模型GRU-656:hidden_size=656, 551.4秒
+模型GRU-985:hidden_size=985, 619.86秒
+模型GRU-1477:hidden_size=1477, 615.13秒
+
+
+=== 测试时间: 2025-09-29 11:02:54 ===
+测试序号:27
+超参数信息：
+epoch_num = 2	lr = 0.001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型localGRU:hidden_size=640, 30.37秒
+模型HGRU-57:hidden_size=640, 37.23秒
+模型HGRU-86:hidden_size=640, 36.63秒
+模型HGRU-129:hidden_size=640, 37.05秒

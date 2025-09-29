@@ -1,0 +1,14 @@
+// 开始任务
+bsub \
+  -n 1 \
+  -R "rusage[mem=2048]" \
+  -q gpu \
+  -gpu "num=1" \
+  -o task_output.txt \
+
+// 进入环境
+conda activate myenv
+conda activate torch_env
+
+// 查看任务
+bjobs

@@ -35,8 +35,8 @@ class BasicModule(Model):
 
 
 class GRU(BasicModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size:int):
-        super().__init__(input_size, hidden_size, output_size )
+    def __init__(self, input_size: int, hidden_size: int, output_size: int):
+        super().__init__(input_size, hidden_size, output_size)
         self.name = "localGRU"
 
         self.r = nn.Linear(input_size + hidden_size, hidden_size)
@@ -134,6 +134,40 @@ class HGRU(BasicModule):
         return outputs, hidden
 
 
+class NormGRU(BasicModule):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int):
+        super().__init__(input_size, hidden_size, output_size)
+        self.name = "normGRU"
+        self.h = nn.Linear(input_size + hidden_size, hidden_size)
+        self.init_weights()
+
+    def init_weights(self):
+        nn.init.xavier_uniform_(self.h.weight, gain=1.0)
+        nn.init.zeros_(self.h.bias)
+        self.init_weights_common()
+
+    def forward(self, x, hidden=None):
+        batch_size, seq_len, _ = x.size()
+        if hidden is None:
+            hidden = self._init_hidden(batch_size, x.device, x.dtype)
+
+        # 预分配outputs张量以提高性能
+        outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
+        
+        for t in range(seq_len):
+            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
+            combined = torch.cat((x_t, hidden), 1)
+            h_tilde = self.h(combined)
+            h = hidden + h_tilde
+            norm = torch.norm(h, dim=1, keepdim=True)
+            hidden = h / norm
+            outputs[:, t, :] = hidden
+
+        outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
+
+        return outputs, hidden
+
+
 class MNISTTester:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
     dataset_root = './data'
@@ -146,7 +180,7 @@ class MNISTTester:
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)  # 训练时打乱数据
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)  # 测试时不需要打乱
 
-    learning_rate = 0.001
+    learning_rate = 1e-3
     batches_num = len(train_loader)
 
     def __init__(self, model):
@@ -172,14 +206,13 @@ class MNISTTester:
                 loss = self._train(images, labels)
                 train_loss_sum += loss
 
-
             loss = train_loss_sum / self.batches_num
-            self.output.add_train_info(loss, i+1)
+            self.output.add_train_info(loss, i + 1)
             train_loss_sum = 0
 
             self._test()
             cr, loss = self._test()
-            self.output.add_test_info(cr, loss, i+1)
+            self.output.add_test_info(cr, loss, i + 1)
 
         end_time = time.perf_counter()
         run_time = end_time - start_time
@@ -230,26 +263,26 @@ class MNISTTester:
 
 
 class MNISTComparer(BasicComparator):
-    file_name = "data"
+    data_name = "MNIST"
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
 
     input_dim = 28
-    hidden_dim = 128
+    hidden_dim = 640
     output_dim = 10
 
     def __init__(self):
         super().__init__()
-        self.models = [GRU(28, 28, 10)]
-        self.epoch_num = 2
+        self.models = [GRU(self.input_dim, self.hidden_dim, self.output_dim)]
+        for a in range(10, 22):
+            i = int(1.5 ** a)
+            self.models.append(HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i).set_name(f"HGRU-{i}"))
+        self.epoch_num = 25
 
     def run(self):
         for model in tqdm(self.models, desc="Module List"):
             t = MNISTTester(model)
             t.run(self.epoch_num)
             self.outputs.append(t.output)
-        self._save_test_text("MNIST")
-        self._save_output(f'result/{self.file_name}')
+        self._save_test_text(self.data_name)
+        self._save_output()
 
-    def load_data(self):
-        """从指定的文件路径加载保存的Outputs列表"""
-        return torch.load(f'result/{self.file_name}', weights_only=False)

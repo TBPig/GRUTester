@@ -152,7 +152,7 @@ class Info:
     INIT_RANGE = 0.1
 
 
-class BaseModel(Model):
+class BasicModule(Model):
     def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, dropout=0.5):
         super().__init__()
         self.name = name
@@ -190,7 +190,7 @@ class BaseModel(Model):
         return f"模型{self.name}:hidden_size={self.hidden_dim}"
 
 
-class GRU(BaseModel):
+class GRU(BasicModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.5):
         super().__init__("localGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.r = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
@@ -233,7 +233,7 @@ class GRU(BaseModel):
         return outputs  # (batch_size, seq_len, hidden_dim)
 
 
-class TorchGRU(BaseModel):
+class TorchGRU(BasicModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.5):
         super().__init__("TorchGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.num_layers = num_layers
@@ -257,7 +257,7 @@ class TorchGRU(BaseModel):
         return h
 
 
-class NormGRU(BaseModel):
+class NormGRU(BasicModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.5):
         super().__init__("normGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.h = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
@@ -292,7 +292,7 @@ class NormGRU(BaseModel):
         return outputs  # (batch_size, seq_len, hidden_dim)
 
 
-class HGRU(BaseModel):
+class HGRU(BasicModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h, dropout=0.5):
         super().__init__("HGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.mpl_n = 2
@@ -341,7 +341,7 @@ class HGRU(BaseModel):
         return f"模型{self.name}:hidden_size={self.hidden_dim},MPL=[{self.mpl_n},{self.mpl_h}]"
 
 
-class NormHGRU(BaseModel):
+class NormHGRU(BasicModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h, dropout=0.5):
         super().__init__("normHGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.input_size = vocab_size
@@ -488,7 +488,7 @@ class PTBComparer(BasicComparator):
     hidden_dim = 200
     num_layers = 2
     dropout = 0.2
-    learning_rate = 1e-4
+    learning_rate = 1e-3
 
     # 数据准备
     extract_path = maybe_download_and_extract(data_path)
