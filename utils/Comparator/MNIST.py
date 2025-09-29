@@ -153,6 +153,7 @@ class NormGRU(BasicModule):
         batch_size, seq_len, _ = x.size()
         if hidden is None:
             hidden = self._init_hidden(batch_size, x.device, x.dtype)
+            hidden[:, 0] = 1
 
         # 预分配outputs张量以提高性能
         outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
@@ -184,6 +185,7 @@ class NormHGRU(BasicModule):
         batch_size, seq_len, _ = x.size()
         if hidden is None:
             hidden = self._init_hidden(batch_size, x.device, x.dtype)
+            hidden[:, 0] = 1
 
         outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
         for t in range(seq_len):
