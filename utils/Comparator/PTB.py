@@ -17,13 +17,10 @@ import collections
 import os
 import time
 from typing import Optional
-
 import numpy as np
 import requests
 import tarfile
 import math
-
-# PyTorch 相关导入
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -31,7 +28,6 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from utils.Output import Output
-from utils.SerialCounter import SerialCounter
 from utils.MPL import mpl
 from utils.Comparator.Basic import BasicComparator, Model
 
@@ -490,23 +486,23 @@ class PTBComparer(BasicComparator):
     dropout = 0.2
     learning_rate = 1e-3
 
-    # 数据准备
-    extract_path = maybe_download_and_extract(data_path)
-    train_data, valid_data, test_data, vocab_size, word_to_id, id_to_word = load_data(extract_path)
-    train_dataset = PTBDataset(train_data, sequence_length)
-    valid_dataset = PTBDataset(valid_data, sequence_length)
-    test_dataset = PTBDataset(test_data, sequence_length)
-
-    # 注意：对于 stateful RNN，shuffle 应该是 False
-    # drop_last=False 允许最后一个不完整的批次
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
-
     def __init__(self):
         super().__init__()
         self.epoch_num = 2
         self.inner_models = None
+        # 数据准备
+        self.extract_path = maybe_download_and_extract(self.data_path)
+        self.train_data, self.valid_data, self.test_data, self.vocab_size, self.word_to_id, self.id_to_word = load_data(
+            self.extract_path)
+        self.train_dataset = PTBDataset(self.train_data, self.sequence_length)
+        self.valid_dataset = PTBDataset(self.valid_data, self.sequence_length)
+        self.test_dataset = PTBDataset(self.test_data, self.sequence_length)
+
+        # 注意：对于 stateful RNN，shuffle 应该是 False
+        # drop_last=False 允许最后一个不完整的批次
+        self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False)
+        self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False)
+        self.test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False)
 
     def choice(self, idx):
         if idx == 0:

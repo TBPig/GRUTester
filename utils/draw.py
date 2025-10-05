@@ -30,10 +30,10 @@ class Draw:
     train_group_num = 1
     test_group_num = 1
 
-    train_y_lim = (0, 0.05)
-    test_y_lim = (0, 0.1)
+    train_y_lim = (0, 0.2)
+    test_y_lim = (0.02, 0.2)
 
-    is_lim = True
+    is_lim = False
 
     def __init__(self, serial=None):
         self.sc = SerialCounter()

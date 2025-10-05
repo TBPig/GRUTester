@@ -147,7 +147,7 @@ class NormGRU(BasicModule):
     def init_weights(self):
         nn.init.xavier_uniform_(self.h.weight, gain=1.0)
         nn.init.zeros_(self.h.bias)
-        self.init_weights_common()
+        super().init_weights()
 
     def forward(self, x, hidden=None):
         batch_size, seq_len, _ = x.size()
@@ -160,11 +160,13 @@ class NormGRU(BasicModule):
 
         for t in range(seq_len):
             x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
+
             combined = torch.cat((x_t, hidden), 1)
             h_tilde = self.h(combined)
             h = hidden + h_tilde
             norm = torch.norm(h, dim=1, keepdim=True)
             hidden = h / norm
+
             outputs[:, t, :] = hidden
 
         outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
@@ -212,15 +214,18 @@ class MNISTTester:
     test_write_steps = 1
     batch_size = 100
 
-    train_dataset = torchvision.datasets.MNIST(root=dataset_root, transform=transforms.ToTensor(), download=True)
-    test_dataset = torchvision.datasets.MNIST(root=dataset_root, transform=transforms.ToTensor(), train=False)
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)  # 训练时打乱数据
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)  # 测试时不需要打乱
-
-    learning_rate = 1e-3
-    batches_num = len(train_loader)
-
     def __init__(self, model):
+        self.train_dataset = torchvision.datasets.MNIST(root=self.dataset_root, transform=transforms.ToTensor(),
+                                                        download=True)
+        self.test_dataset = torchvision.datasets.MNIST(root=self.dataset_root, transform=transforms.ToTensor(),
+                                                       train=False)
+        self.train_loader = torch.utils.data.DataLoader(dataset=self.train_dataset, batch_size=self.batch_size,
+                                                        shuffle=True)  # 训练时打乱数据
+        self.test_loader = torch.utils.data.DataLoader(dataset=self.test_dataset, batch_size=self.batch_size,
+                                                       shuffle=False)  # 测试时不需要打乱
+
+        self.learning_rate = 1e-4
+        self.batches_num = len(self.train_loader)
         # 超参数
         self.model = model.to(self.device)
         # 损失函数与优化器
@@ -324,6 +329,15 @@ class MNISTComparer(BasicComparator):
                 i = int(1.7 ** a)
                 self.models.append(
                     NormGRU(self.input_dim, i, self.output_dim).set_name(f"normGRU-{i}"))
+        elif idx == 2:
+            for a in range(8, 13):
+                i = int(1.7 ** a)
+                self.models.append(
+                    NormHGRU(self.input_dim, 640, self.output_dim, mpl_h=i).set_name(f"normHGRU-{i}"))
+        elif idx == 3:
+            for a in range(9, 15):
+                i = int(1.7 ** a)
+                self.models = [GRU(self.input_dim, i, self.output_dim)]
 
     def run(self):
         for model in tqdm(self.models, desc="Module List"):

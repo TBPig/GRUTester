@@ -21,7 +21,8 @@ def main():
     args = parser.parse_args()
 
     if args.draw_only:
-        d = Draw(serial=args.serial)
+        serial = int(input("绘画序号: "))
+        d = Draw(serial=serial)
         d.draw_output()
         return
 
