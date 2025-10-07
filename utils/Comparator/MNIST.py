@@ -320,24 +320,30 @@ class MNISTComparer(BasicComparator):
     def choice(self, idx=0):
         self.models = [GRU(self.input_dim, self.hidden_dim, self.output_dim)]
         if idx == 0:
+            self.models = []
+            for a in range(9, 15):
+                i = int(1.7 ** a)
+                self.models.append(GRU(self.input_dim, i, self.output_dim))
+        elif idx == 1:
             for a in range(9, 14):
                 i = int(1.7 ** a)
                 self.models.append(
                     HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i).set_name(f"HGRU-{i}"))
-        elif idx == 1:
+        elif idx == 2:
+            for a in range(9, 15):
+                i = int(1.7 ** a)
+                self.models.append(
+                    HGRU(self.input_dim, i, self.output_dim, mpl_h=582).set_name(f"HGRU-{i}"))
+        elif idx == 3:
             for a in range(10, 15):
                 i = int(1.7 ** a)
                 self.models.append(
                     NormGRU(self.input_dim, i, self.output_dim).set_name(f"normGRU-{i}"))
-        elif idx == 2:
+        elif idx == 4:
             for a in range(8, 13):
                 i = int(1.7 ** a)
                 self.models.append(
                     NormHGRU(self.input_dim, 640, self.output_dim, mpl_h=i).set_name(f"normHGRU-{i}"))
-        elif idx == 3:
-            for a in range(9, 15):
-                i = int(1.7 ** a)
-                self.models = [GRU(self.input_dim, i, self.output_dim)]
 
     def run(self):
         for model in tqdm(self.models, desc="Module List"):

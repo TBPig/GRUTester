@@ -371,3 +371,78 @@ epoch_num = 100	lr = 0.001	batch_size = 100
 模型normGRU-582:hidden_size=582, 1282.56秒
 模型normGRU-990:hidden_size=990, 665.59秒
 模型normGRU-1683:hidden_size=1683, 1092.62秒
+
+
+=== 测试时间: 2025-10-05 10:21:55 ===
+测试序号:13
+超参数信息：
+epoch_num = 200	lr = 0.0001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型localGRU:hidden_size=1683, 5314.47秒
+
+
+=== 测试时间: 2025-10-05 14:46:48 ===
+测试序号:12
+超参数信息：
+epoch_num = 200	lr = 0.0001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型localGRU:hidden_size=640, 4307.86秒
+模型normHGRU-69:hidden_size=640,mpl=[2,69], 3888.0秒
+模型normHGRU-118:hidden_size=640,mpl=[2,118], 3385.56秒
+模型normHGRU-201:hidden_size=640,mpl=[2,201], 3279.16秒
+模型normHGRU-342:hidden_size=640,mpl=[2,342], 3251.81秒
+模型normHGRU-582:hidden_size=640,mpl=[2,582], 3095.34秒
+
+
+=== 测试时间: 2025-10-06 08:09:45 ===
+测试序号:22
+超参数信息：
+epoch_num = 200	lr = 0.0001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型localGRU:hidden_size=640, 11269.12秒
+模型normHGRU-69:hidden_size=640,mpl=[2,69], 5208.0秒
+模型normHGRU-118:hidden_size=640,mpl=[2,118], 6602.52秒
+模型normHGRU-201:hidden_size=640,mpl=[2,201], 6034.43秒
+模型normHGRU-342:hidden_size=640,mpl=[2,342], 5769.7秒
+模型normHGRU-582:hidden_size=640,mpl=[2,582], 4642.04秒
+
+
+=== 测试时间: 2025-10-06 11:24:10 ===
+测试序号:24
+超参数信息：
+epoch_num = 200	lr = 0.0001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型localGRU:hidden_size=640, 5916.06秒
+模型HGRU-118:hidden_size=118,mpl=[2,582], 3055.45秒
+模型HGRU-201:hidden_size=201,mpl=[2,582], 3798.77秒
+模型HGRU-342:hidden_size=342,mpl=[2,582], 5022.12秒
+模型HGRU-582:hidden_size=582,mpl=[2,582], 7079.16秒
+模型HGRU-990:hidden_size=990,mpl=[2,582], 9222.81秒
+模型HGRU-1683:hidden_size=1683,mpl=[2,582], 17106.33秒
+
+
+=== 测试时间: 2025-10-06 13:55:49 ===
+测试序号:23
+超参数信息：
+epoch_num = 200	lr = 0.0001	batch_size = 100	
+数据集信息：
+数据名MNIST
+模型信息：
+模型localGRU:hidden_size=118, 5909.61秒
+模型localGRU:hidden_size=201, 7830.28秒
+模型localGRU:hidden_size=342, 12912.21秒
+模型localGRU:hidden_size=582, 13318.8秒
+模型localGRU:hidden_size=990, 7706.57秒
+模型localGRU:hidden_size=1683, 12621.22秒
+
+
+
+

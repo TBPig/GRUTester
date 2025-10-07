@@ -27,11 +27,11 @@ def group(x_arr, y_arr, group_num=1):
 
 class Draw:
     path = 'result/img'
-    train_group_num = 1
-    test_group_num = 1
+    train_group_num = 4
+    test_group_num = 9
 
-    train_y_lim = (0, 0.2)
-    test_y_lim = (0.02, 0.2)
+    train_y_lim = (0, 0.05)
+    test_y_lim = (0, 0.1)
 
     is_lim = False
 

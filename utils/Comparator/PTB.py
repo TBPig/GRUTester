@@ -506,9 +506,12 @@ class PTBComparer(BasicComparator):
 
     def choice(self, idx):
         if idx == 0:
+            self.inner_models = [GRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout),
+                                 TorchGRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout)]
+        elif idx == 1:
             self.inner_models = [
                 GRU(self.vocab_size, self.embedding_dim, hidden_dim, dropout=self.dropout)
-                for hidden_dim in range(200, 300, 200)  # 200, 400, 600, 800, 1000, 1200
+                for hidden_dim in [200, 400, 600, 1000,1400,1800,2200]  # 200, 400, 600, 800, 1000, 1200
             ]
 
     def run(self):

@@ -4,7 +4,7 @@ bsub \
   -q gpu \
   -gpu "num=1" \
   -o task_output.txt \
-  python main.py --test MNIST --epochs 40 --model-group 1 --serial 2
+  python main.py --test PTB --epochs 50 --model-group 0 --serial 111
 
 // 进入环境
 conda activate myenv
