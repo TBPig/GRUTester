@@ -446,3 +446,28 @@ epoch_num = 200	lr = 0.0001	batch_size = 100
 
 
 
+
+
+=== 测试时间: 2025-10-07 17:04:47 ===
+测试序号:111
+超参数信息：
+epoch_num = 50	lr = 0.001	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型localGRU:hidden_size=600, 3336.18秒
+模型TorchGRU:hidden_size=600, 2630.41秒
+
+
+=== 测试时间: 2025-10-11 00:47:08 ===
+测试序号:112
+超参数信息：
+epoch_num = 50	lr = 0.001	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型localGRU:hidden_size=2000, 12097.84秒
+模型localGRU:hidden_size=2500, 15638.97秒
+模型localGRU:hidden_size=3000, 59277.13秒
+模型localGRU:hidden_size=4000, 87091.74秒
+模型localGRU:hidden_size=5000, 118775.56秒

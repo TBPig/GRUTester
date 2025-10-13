@@ -24,7 +24,6 @@ import math
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-import torch.optim as optim
 from tqdm import tqdm
 
 from utils.Output import Output
@@ -179,8 +178,7 @@ class BasicModule(Model):
         return decoded, hidden
 
     def special_forward(self, x, hidden):
-        """默认实现，子类应重写此方法"""
-        raise NotImplementedError("Subclasses should implement this method")
+        raise NotImplementedError("默认实现，子类应重写此方法")
 
     def get_info(self):
         return f"模型{self.name}:hidden_size={self.hidden_dim}"
@@ -511,7 +509,7 @@ class PTBComparer(BasicComparator):
         elif idx == 1:
             self.inner_models = [
                 GRU(self.vocab_size, self.embedding_dim, hidden_dim, dropout=self.dropout)
-                for hidden_dim in [200, 400, 600, 1000,1400,1800,2200]  # 200, 400, 600, 800, 1000, 1200
+                for hidden_dim in [2000,2500,3000,4000,5000]
             ]
 
     def run(self):
@@ -526,7 +524,7 @@ class PTBComparer(BasicComparator):
         start_time = time.perf_counter()
         # --- 优化器和损失函数 ---
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(model.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
 
         for epoch in tqdm(range(epoch_num)):
             train_loss, train_ppl = train(model, self.train_loader, criterion, optimizer, self.device)
