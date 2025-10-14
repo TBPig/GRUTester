@@ -1,15 +1,14 @@
+// 进入环境
+conda activate myenv
+conda activate torch_env
+
 // 开始任务
 bsub \
   -n 1 \
   -q gpu \
   -gpu "num=1" \
   -o task_output.txt \
-  python main.py --test PTB --epochs 50 --model-group 0 --serial 111
-  python main.py --test PTB --epochs 50 --model-group 1 --serial 112
-
-// 进入环境
-conda activate myenv
-conda activate torch_env
+  python main.py --test PTB --epochs 50 --model-group 0 --serial 122
 
 // 查看任务
 bjobs

@@ -471,3 +471,14 @@ epoch_num = 50	lr = 0.001	batch_size = 20
 模型localGRU:hidden_size=3000, 59277.13秒
 模型localGRU:hidden_size=4000, 87091.74秒
 模型localGRU:hidden_size=5000, 118775.56秒
+
+
+=== 测试时间: 2025-10-13 21:36:53 ===
+测试序号:121
+超参数信息：
+epoch_num = 100	lr = 0.001	batch_size = 20	
+数据集信息：
+数据名PTB
+模型信息：
+模型localGRU:hidden_size=600, 4140.59秒
+模型TorchGRU:hidden_size=600, 895.74秒

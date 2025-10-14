@@ -27,7 +27,7 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 from utils.Output import Output
-from utils.MPL import mpl
+from utils.MLP import mpl
 from utils.Comparator.Basic import BasicComparator, Model
 
 
@@ -171,7 +171,8 @@ class BasicModule(Model):
         return h
 
     def forward(self, x, hidden):
-        x = self.dropout(self.embedding(x))
+        # x = self.dropout(self.embedding(x))
+        x = self.embedding(x)
         output = self.special_forward(x, hidden)
         decoded = self.fc(output)
 

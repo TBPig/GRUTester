@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 
 from utils.Output import Output
-from utils.MPL import mpl
+from utils.MLP import mpl
 from utils.Comparator.Basic import BasicComparator, Model
 
 
