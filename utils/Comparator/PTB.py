@@ -26,9 +26,8 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-from utils.Output import Output
-from utils.MLP import mpl
-from utils.Comparator.Basic import BasicComparator, Model
+from utils.MLP import mlp
+from utils.Comparator.Basic import BasicComparator, BasicModule
 
 
 # --- 1. 数据加载与预处理 ---
@@ -147,7 +146,7 @@ class Info:
     INIT_RANGE = 0.1
 
 
-class BasicModule(Model):
+class BasicModule(BasicModule):
     def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, dropout=0.5):
         super().__init__()
         self.name = name
@@ -295,7 +294,7 @@ class HGRU(BasicModule):
 
         self.r = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
         self.z = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
-        self.h = mpl(embedding_dim + hidden_dim, hidden_dim, self.mpl_n, self.mpl_h)
+        self.h = mlp(embedding_dim + hidden_dim, hidden_dim, self.mpl_n, self.mpl_h)
         # 初始化权重
         self.init_weights()
 
@@ -343,7 +342,7 @@ class NormHGRU(BasicModule):
         self.mpl_n = 2
         self.mpl_h = mpl_h
 
-        self.h = mpl(embedding_dim + hidden_dim, hidden_dim, self.mpl_n, self.mpl_h)
+        self.h = mlp(embedding_dim + hidden_dim, hidden_dim, self.mpl_n, self.mpl_h)
         # 初始化权重
         self.init_weights()
 
@@ -517,11 +516,8 @@ class PTBComparer(BasicComparator):
         for model in tqdm(self.inner_models, desc="Module List"):
             model = model.to(self.device)
             self.run_model(model, self.epoch_num)
-        self._save_test_text(self.data_name)
-        self._save_output()
 
     def run_model(self, model, epoch_num):
-        output = Output()
         start_time = time.perf_counter()
         # --- 优化器和损失函数 ---
         criterion = nn.CrossEntropyLoss()
@@ -529,16 +525,7 @@ class PTBComparer(BasicComparator):
 
         for epoch in tqdm(range(epoch_num)):
             train_loss, train_ppl = train(model, self.train_loader, criterion, optimizer, self.device)
-            output.add_train_info(train_loss, epoch + 1)
             test_loss, test_ppl, cr = evaluate(model, self.test_loader, criterion, self.device)
-            output.add_test_info(cr, test_loss, epoch + 1)
 
         end_time = time.perf_counter()
         run_time = end_time - start_time
-        (output.set_time(run_time)
-         .set_model(model)
-         .add_info("epoch_num", epoch_num)
-         .add_info("lr", self.learning_rate)
-         .add_info("batch_size", self.batch_size)
-         )
-        self.outputs.append(output)

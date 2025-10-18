@@ -5,8 +5,7 @@ from typing import Tuple
 import time
 from tqdm import tqdm
 
-from utils.Output import Output
-from utils.Comparator.Basic import BasicComparator, Model
+from utils.Comparator.Basic import BasicComparator, BasicModule
 
 
 class CopyTaskGenerator:
@@ -61,7 +60,7 @@ class CopyTaskGenerator:
         return torch.LongTensor(input_seq), torch.LongTensor(target_seq)
 
 
-class BaseModel(Model):
+class BaseModel(BasicModule):
     """CopyTask模型的基类"""
 
     def __init__(self, name: str, vocab_size: int, embedding_dim: int, hidden_dim: int):
@@ -231,7 +230,7 @@ class CopyTaskTester:
                 total_loss += loss.item()
                 total_batches += 1
 
-                # outputs shape: [batch_size, seq_len, vocab_size]
+                # module_info shape: [batch_size, seq_len, vocab_size]
 
                 # 只计算需要预测的位置（非零位置）
                 mask = targets != 0
@@ -262,7 +261,7 @@ class CopyTaskTester:
             'inputs': inputs.cpu().numpy(),
             'targets': targets.cpu().numpy(),
             'predicted': predicted.cpu().numpy(),
-            'outputs': outputs.cpu().numpy()
+            'module_info': outputs.cpu().numpy()
         }
 
 
@@ -329,5 +328,5 @@ class CopyTaskComparer(BasicComparator):
 
             self.outputs.append(output)
 
-        self._save_test_text("CopyTask")
+        _save_test_text("CopyTask")
         self._save_output()

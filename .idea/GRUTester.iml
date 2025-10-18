@@ -4,8 +4,10 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/data" />
-      <excludeFolder url="file://$MODULE_DIR$/result/data" />
-      <excludeFolder url="file://$MODULE_DIR$/result/img" />
+      <excludeFolder url="file://$MODULE_DIR$/old_result" />
+      <excludeFolder url="file://$MODULE_DIR$/old_result/data" />
+      <excludeFolder url="file://$MODULE_DIR$/old_result/img" />
+      <excludeFolder url="file://$MODULE_DIR$/result" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.11 (GRUTester)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

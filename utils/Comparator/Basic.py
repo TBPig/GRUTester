@@ -1,11 +1,43 @@
 import os
 import time
 from abc import ABC, abstractmethod
-
-import torch
 from torch import nn
+import pandas as pd
 
-from utils.SerialCounter import SerialCounter
+
+class Saver:
+    """
+    用于保存模型训练结果的类
+    记录每轮训练数据，最终保存为CSV文件
+    """
+
+    def __init__(self):
+        self.training_data = []
+
+    def add_epoch_data(self, **kwargs):
+        self.training_data.append(kwargs)
+
+    def save_results(self, path: str, name: str):
+        try:
+            if not os.path.exists(path):
+                os.makedirs(path)
+        except OSError as e:
+            raise OSError(f"无法创建目录 {path}: {e}")
+
+        csv_file_path = os.path.join(path, f"{name}.csv")
+
+        if not self.training_data:
+            return
+
+        df = pd.DataFrame(self.training_data)
+
+        # 确保epoch列在最前面
+        if 'epoch' in df.columns:
+            cols = df.columns.tolist()
+            cols.insert(0, cols.pop(cols.index('epoch')))
+            df = df[cols]
+
+        df.to_csv(csv_file_path, index=False, encoding='utf-8')
 
 
 class BasicComparator(ABC):
@@ -14,9 +46,8 @@ class BasicComparator(ABC):
     """
 
     def __init__(self):
-        sc = SerialCounter()
-        self.serial = sc.new_serial()
-        self.outputs = []
+        self.id = time.strftime("%Y%m%d-%H%M%S")
+        self.data_name = "Basic"
 
     @abstractmethod
     def run(self):
@@ -32,54 +63,32 @@ class BasicComparator(ABC):
         """
         pass
 
-    def _save_test_text(self, data_name):
+    def save_data(self, cs:Saver, name:str):
+        cs.save_results(f'result/{self.data_name}/{self.id}', name)
+
+    def save_info(self, infos: dict, module_infos: list[dict]):
         """
         保存测试文本信息
         """
         current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         # 生成要保存的信息
-        info = f"\n\n=== 测试时间: {current_time} ===\n"
-        info += f"测试序号:{self.serial}\n"
-        # 添加超参数信息（从第一个输出中获取，因为测试信息相同）
-        info += "超参数信息：\n"
-        for key, value in self.outputs[0].test_info.items():
-            info += f"{key} = {value}\t"
-        # 添加数据集信息
-        info += "\n数据集信息：\n"
-        info += f"数据名{data_name}"
+        info = f"\n=== 测试时间: {current_time} ===\n"
+        for key, value in infos.items():
+            info += f"{key}: {value}\n"
+
         # 添加每个模型的名称和信息
-        info += "\n模型信息：\n"
-        for output in self.outputs:
-            info += output.model_info + ', ' + str(round(output.consume_time, 2)) + "秒\n"
+        info += "模型信息：\n"
+        for module_info in module_infos:
+            for key, value in module_info.items():
+                info += f"{key}: {value}|"
+            info += "\n"
 
         # 追加写入文件
-        with open("result/test_result.txt", "a", encoding="utf-8") as f:
+        with open(f"result/{self.data_name}/{self.id}/info.txt", "a", encoding="utf-8") as f:
             f.write(info)
 
-    def _save_output(self, path='result/data'):
-        """
-        保存 outputs 列表到文件，并自动删除只保留最近的3条记录
-        """
-        # 检查目录是否存在，如果不存在则创建
-        if not os.path.exists(path):
-            os.makedirs(path)
 
-        # 构建文件路径
-        filename = f'{path}/{self.serial:04d}.outs'
-        # 使用torch.save保存整个outputs列表
-        torch.save(self.outputs, filename)
-
-        # 获取所有保存的文件并按修改时间排序
-        files = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('.outs')]
-        files.sort(key=lambda x: os.path.getmtime(x))
-
-        # 删除多余的文件，只保留最近的3个
-        if len(files) > 7:
-            for file_to_remove in files[:-3]:
-                os.remove(file_to_remove)
-
-
-class Model(nn.Module):
+class BasicModule(nn.Module):
     def __init__(self):
         super().__init__()
         self.name = 'model'

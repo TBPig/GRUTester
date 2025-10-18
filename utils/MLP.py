@@ -1,6 +1,6 @@
 from torch import nn as nn
 
-def mpl(input_size, output_size, num_layer, hidden_size):
+def mlp(input_size, output_size, num_layer, hidden_size):
     layers = []
     for i in range(num_layer):
         in_features = input_size if i == 0 else hidden_size
