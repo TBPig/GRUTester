@@ -1,14 +1,14 @@
 // 进入环境
-conda activate myenv
 conda activate torch_env
 
 // 开始任务
 bsub \
   -n 1 \
   -q gpu \
-  -gpu "num=1" \
+  -gpu "num=2" \
+  -R "rusage[mem=6GB]" \
   -o task_output.txt \
-  python main.py --test PTB --epochs 50 --model-group 0 --serial 122
+  "python main.py --test MNIST --epochs 500 --group 0"
 
 // 查看任务
 bjobs

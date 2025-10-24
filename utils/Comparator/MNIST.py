@@ -6,6 +6,7 @@ import torchvision
 import torchvision.transforms as transforms
 from tqdm import tqdm
 
+from utils.Comparator.module.LocalGRU import LocalGRU
 from utils.MLP import mlp
 from utils.Comparator.Basic import BasicComparator, BasicModule, Saver
 
@@ -32,11 +33,22 @@ class MNISTModule(BasicModule):
     def get_info(self):
         return f"模型{self.name}:hidden_size={self.hidden_size}"
 
+class NestGRU(MNISTModule):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int):
+        super().__init__(input_size, hidden_size, output_size)
+        self.name = "NestGRU"
+        self.local_gru = LocalGRU(input_size, hidden_size, hidden_size)
+        self.init_weights()
+
+    def forward(self, x, hidden=None):
+        gru_out, hidden = self.local_gru(x, hidden)
+        outputs = self.fc(gru_out)
+        return outputs, hidden
 
 class GRU(MNISTModule):
     def __init__(self, input_size: int, hidden_size: int, output_size: int):
         super().__init__(input_size, hidden_size, output_size)
-        self.name = "localGRU"
+        self.name = "Localgru"
 
         self.r = nn.Linear(input_size + hidden_size, hidden_size)
         self.z = nn.Linear(input_size + hidden_size, hidden_size)
@@ -57,7 +69,9 @@ class GRU(MNISTModule):
         if hidden is None:
             hidden = self._init_hidden(batch_size, x.device, x.dtype)
 
-        outputs = []
+        # 预分配outputs张量以提高性能
+        outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
+        
         for t in range(seq_len):
             x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
 
@@ -69,9 +83,8 @@ class GRU(MNISTModule):
 
             # 更新隐藏状态
             hidden = (1 - z) * hidden + z * h_title
-            outputs.append(hidden)
+            outputs[:, t, :] = hidden
 
-        outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_dim)
         outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
 
         return outputs, hidden
@@ -207,7 +220,6 @@ class NormHGRU(MNISTModule):
 
 
 class MNISTComparer(BasicComparator):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
     dataset_root = './data'
     batch_size = 100
     learning_rate = 1e-4
@@ -218,6 +230,7 @@ class MNISTComparer(BasicComparator):
 
     def __init__(self):
         super().__init__()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
         self.data_name = "MNIST"
         self.models: list[MNISTModule] = []
         self.epoch_num = 40
@@ -233,41 +246,40 @@ class MNISTComparer(BasicComparator):
                                                        shuffle=False)  # 测试时不需要打乱
         self.batches_num = len(self.train_loader)
 
-    def _train(self, model: BasicModule, epoch_num: int):
+    def _train_module(self, module: BasicModule, epoch_num: int):
         """训练单个模型"""
         cs = Saver()
 
-        model = model.to(self.device)
+        module = module.to(self.device)
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(module.parameters(), lr=self.learning_rate)
 
-        for i in tqdm(range(epoch_num), desc='Train', colour='white', leave=False):
-            train_loss_sum = 0
-            for j, (images, labels) in enumerate(self.train_loader):
-                loss = self._train_step(model, criterion, optimizer, images, labels)
-                train_loss_sum += loss
-
-            train_loss = train_loss_sum / self.batches_num
-            cr, test_loss = self._test(model, criterion)
+        for i in range(epoch_num):
+            train_loss = self._train(module, criterion, optimizer)
+            cr, test_loss = self._test(module, criterion)
             cs.add_epoch_data(epoch=i, train_loss=train_loss, test_loss=test_loss, test_acc=cr)
-        self.save_data(cs, model.name)
+        self.save_data(cs, module.name)
 
-    def _train_step(self, model, criterion, optimizer, input_data, labels):
+    def _train(self, module, criterion, optimizer):
         """执行一次训练步骤"""
-        input_data = input_data.reshape(-1, 28, 28).to(self.device)
-        labels = labels.to(self.device)
+        train_loss_sum = 0
+        for images, labels in self.train_loader:
+            input_data = images.reshape(-1, 28, 28).to(self.device)
+            labels = labels.to(self.device)
 
-        # 前向计算
-        outputs, _ = model(input_data)
-        predict = outputs[:, -1, :]
-        loss = criterion(predict, labels)
+            # 前向计算
+            outputs, _ = module(input_data)
+            predict = outputs[:, -1, :]
+            loss = criterion(predict, labels)
 
-        # 反向传播
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            # 反向传播
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        return loss.item()
+            train_loss_sum += loss.item()
+
+        return train_loss_sum / self.batches_num
 
     def _test(self, model, criterion):
         """测试模型"""
@@ -297,7 +309,8 @@ class MNISTComparer(BasicComparator):
         if idx == 0:
             self.models = [
                 GRU(self.input_dim, self.hidden_dim, self.output_dim),
-                TorchGRU(self.input_dim, self.hidden_dim, self.output_dim)
+                TorchGRU(self.input_dim, self.hidden_dim, self.output_dim),
+                NestGRU(self.input_dim, self.hidden_dim, self.output_dim)
             ]
             pass
         elif idx == 1:
@@ -332,7 +345,7 @@ class MNISTComparer(BasicComparator):
         for model in tqdm(self.models, desc="Module List"):
             # 开始计时
             start_time = time.perf_counter()
-            self._train(model, self.epoch_num)
+            self._train_module(model, self.epoch_num)
             end_time = time.perf_counter()
             model_infos.append({"模型名": model.name, "模型属性": model.get_info(), "时间开销": end_time - start_time})
         self.save_info(infos, model_infos)

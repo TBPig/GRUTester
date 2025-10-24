@@ -91,7 +91,7 @@ class BasicComparator(ABC):
 class BasicModule(nn.Module):
     def __init__(self):
         super().__init__()
-        self.name = 'model'
+        self.name = 'module'
 
     def set_name(self, name):
         self.name = name

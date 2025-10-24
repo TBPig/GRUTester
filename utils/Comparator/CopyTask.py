@@ -92,7 +92,7 @@ class GRU(BaseModel):
     """自定义GRU实现"""
 
     def __init__(self, vocab_size: int, embedding_dim: int, hidden_dim: int):
-        super().__init__("localGRU", vocab_size, embedding_dim, hidden_dim)
+        super().__init__("Localgru", vocab_size, embedding_dim, hidden_dim)
 
         self.r = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
         self.z = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
@@ -108,7 +108,9 @@ class GRU(BaseModel):
         if hidden is None:
             hidden = self.init_hidden(batch_size, x.device)
 
-        outputs = []
+        # 预分配outputs张量以提高性能
+        outputs = torch.empty(batch_size, seq_len, self.hidden_dim, device=x.device, dtype=x.dtype)
+        
         for t in range(seq_len):
             x_t = x[:, t, :]
             combined = torch.cat((x_t, hidden), dim=1)
@@ -119,9 +121,8 @@ class GRU(BaseModel):
             h_title = torch.tanh(self.h(kx_combined))
 
             hidden = (1 - z) * hidden + z * h_title
-            outputs.append(hidden)
+            outputs[:, t, :] = hidden
 
-        outputs = torch.stack(outputs, dim=1)
         outputs = self.fc(outputs)
 
         return outputs, hidden

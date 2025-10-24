@@ -186,7 +186,7 @@ class BasicModule(BasicModule):
 
 class GRU(BasicModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.5):
-        super().__init__("localGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+        super().__init__("Localgru", vocab_size, embedding_dim, hidden_dim, dropout)
         self.r = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
         self.z = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
         self.h = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
