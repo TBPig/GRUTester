@@ -2,11 +2,13 @@ import torch
 import sys
 import argparse
 
+from PyQt5.QtWidgets import QApplication
+
 from utils.Comparator.Basic import BasicComparator
 from utils.Comparator.MNIST import MNISTComparer
 from utils.Comparator.PTB import PTBComparer
 from utils.Comparator.CopyTask import CopyTaskComparer
-from utils.draw import Draw
+from utils.gui import MainWindow
 
 
 def main():
@@ -20,8 +22,10 @@ def main():
     args = parser.parse_args()
 
     if args.draw_only:
-        Draw().draw_output()
-        return
+        app = QApplication(sys.argv)
+        window = MainWindow()
+        window.show()
+        sys.exit(app.exec_())
 
     if args.test == 'PTB':
         c: BasicComparator = PTBComparer()
