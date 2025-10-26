@@ -3,27 +3,6 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="\20251024-164820\Localgru.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\20251024-164820\NestGRU.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\20251024-164820\TorchGRU.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\result\MNIST\0\Localgru.csv">
           <value>
             <Attribute>
@@ -38,21 +17,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\result\MNIST\20251024-163317\Localgru.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\result\MNIST\20251024-163317\NestGRU.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\result\MNIST\20251024-163317\TorchGRU.csv">
+        <entry key="\result\MNIST\20251026-155637\NestGRU.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

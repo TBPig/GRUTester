@@ -12,16 +12,20 @@ from utils.Comparator.Basic import BasicComparator, BasicModule, Saver
 
 
 class MNISTModule(BasicModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, dropout: float = 0.0):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
+        self.dropout_p = dropout
 
         # 添加输出层
         self.fc = nn.Linear(hidden_size, self.output_size)
-
-    def init_weights(self):
+        if dropout > 0.0:
+            self.dropout = nn.Dropout(dropout)
+        else:
+            self.dropout = None
+            
         init_range = 0.1
         nn.init.uniform_(self.fc.weight, -init_range, init_range)
         nn.init.zeros_(self.fc.bias)
@@ -31,33 +35,35 @@ class MNISTModule(BasicModule):
         return torch.zeros(batch_size, self.hidden_size, device=device, dtype=dtype)
 
     def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_size}"
+        base_info = f"模型{self.name}:hidden_size={self.hidden_size}"
+        if self.dropout_p > 0:
+            base_info += f",dropout={self.dropout_p}"
+        return base_info
+
 
 class NestGRU(MNISTModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int):
-        super().__init__(input_size, hidden_size, output_size)
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, dropout: float = 0.0):
+        super().__init__(input_size, hidden_size, output_size, dropout)
         self.name = "NestGRU"
-        self.local_gru = LocalGRU(input_size, hidden_size, hidden_size)
-        self.init_weights()
+        self.gru = LocalGRU(input_size, hidden_size)
 
     def forward(self, x, hidden=None):
-        gru_out, hidden = self.local_gru(x, hidden)
+        gru_out, hidden = self.gru(x, hidden)
+        if self.dropout is not None:
+            gru_out = self.dropout(gru_out)
         outputs = self.fc(gru_out)
         return outputs, hidden
 
+
 class GRU(MNISTModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int):
-        super().__init__(input_size, hidden_size, output_size)
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, dropout: float = 0.0):
+        super().__init__(input_size, hidden_size, output_size, dropout)
         self.name = "Localgru"
 
         self.r = nn.Linear(input_size + hidden_size, hidden_size)
         self.z = nn.Linear(input_size + hidden_size, hidden_size)
         self.h = nn.Linear(input_size + hidden_size, hidden_size)
         # 添加输出层
-        self.init_weights()
-
-    def init_weights(self):
-        super().init_weights()
         for linear in [self.r, self.z, self.h]:
             nn.init.xavier_uniform_(linear.weight, gain=1.0)
             nn.init.zeros_(linear.bias)
@@ -71,7 +77,7 @@ class GRU(MNISTModule):
 
         # 预分配outputs张量以提高性能
         outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
-        
+
         for t in range(seq_len):
             x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
 
@@ -85,34 +91,38 @@ class GRU(MNISTModule):
             hidden = (1 - z) * hidden + z * h_title
             outputs[:, t, :] = hidden
 
+        if self.dropout is not None:
+            outputs = self.dropout(outputs)
         outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
 
         return outputs, hidden
 
 
 class TorchGRU(MNISTModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers=1, batch_first=True):
-        super().__init__(input_size, hidden_size, output_size)
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers=1, batch_first=True, dropout: float = 0.0):
+        super().__init__(input_size, hidden_size, output_size, dropout)
         self.name = "TorchGRU"
         # 使用 PyTorch 的 GRU 层
         self.gru = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
-            batch_first=batch_first
+            batch_first=batch_first,
+            dropout=dropout if num_layers > 1 else 0.0  # 只有在多层时才使用dropout
         )
-        self.init_weights()
 
     def forward(self, x, hidden=None):
         gru_out, hidden = self.gru(x, hidden)  # gru_out: (batch, seq_len, hidden_dim)
+        if self.dropout is not None:
+            gru_out = self.dropout(gru_out)
         # 应用输出层
         outputs = self.fc(gru_out)  # (batch_size, seq_len, output_size)
         return outputs, hidden
 
 
 class HGRU(MNISTModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, mpl_n=2, mpl_h=144):
-        super().__init__(input_size, hidden_size, output_size)
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, mpl_n=2, mpl_h=144, dropout: float = 0.0):
+        super().__init__(input_size, hidden_size, output_size, dropout)
         self.name = "HGRU"
         self.mpl_n = mpl_n
         self.mpl_h = mpl_h
@@ -121,7 +131,6 @@ class HGRU(MNISTModule):
         self.z = nn.Linear(input_size + hidden_size, hidden_size)
         self.h = mlp(input_size + hidden_size, hidden_size, mpl_n, mpl_h)
 
-        self.init_weights()
 
     def forward(self, x, hidden=None):
         batch_size, seq_len, _ = x.size()
@@ -141,25 +150,26 @@ class HGRU(MNISTModule):
             outputs.append(hidden)
 
         outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_dim)
+        if self.dropout is not None:
+            outputs = self.dropout(outputs)
         outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
 
         return outputs, hidden
 
     def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_size},mlp=[{self.mpl_n},{self.mpl_h}]"
+        base_info = f"模型{self.name}:hidden_size={self.hidden_size},mlp=[{self.mpl_n},{self.mpl_h}]"
+        if self.dropout_p > 0:
+            base_info += f",dropout={self.dropout_p}"
+        return base_info
 
 
 class NormGRU(MNISTModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int):
-        super().__init__(input_size, hidden_size, output_size)
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, dropout: float = 0.0):
+        super().__init__(input_size, hidden_size, output_size, dropout)
         self.name = "normGRU"
         self.h = nn.Linear(input_size + hidden_size, hidden_size)
-        self.init_weights()
-
-    def init_weights(self):
         nn.init.xavier_uniform_(self.h.weight, gain=1.0)
         nn.init.zeros_(self.h.bias)
-        super().init_weights()
 
     def forward(self, x, hidden=None):
         batch_size, seq_len, _ = x.size()
@@ -181,19 +191,20 @@ class NormGRU(MNISTModule):
 
             outputs[:, t, :] = hidden
 
+        if self.dropout is not None:
+            outputs = self.dropout(outputs)
         outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
 
         return outputs, hidden
 
 
 class NormHGRU(MNISTModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, mpl_n=2, mpl_h=144):
-        super().__init__(input_size, hidden_size, output_size)
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, mpl_n=2, mpl_h=144, dropout: float = 0.0):
+        super().__init__(input_size, hidden_size, output_size, dropout)
         self.name = "normHGRU"
         self.mpl_n = mpl_n
         self.mpl_h = mpl_h
         self.h = mlp(input_size + hidden_size, hidden_size, mpl_n, mpl_h)
-        self.init_weights()
 
     def forward(self, x, hidden=None):
         batch_size, seq_len, _ = x.size()
@@ -211,12 +222,17 @@ class NormHGRU(MNISTModule):
             hidden = h / norm
             outputs[:, t, :] = hidden
 
+        if self.dropout is not None:
+            outputs = self.dropout(outputs)
         outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
 
         return outputs, hidden
 
     def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_size},mlp=[{self.mpl_n},{self.mpl_h}]"
+        base_info = f"模型{self.name}:hidden_size={self.hidden_size},mlp=[{self.mpl_n},{self.mpl_h}]"
+        if self.dropout_p > 0:
+            base_info += f",dropout={self.dropout_p}"
+        return base_info
 
 
 class MNISTComparer(BasicComparator):
@@ -227,6 +243,7 @@ class MNISTComparer(BasicComparator):
     input_dim = 28
     hidden_dim = 640
     output_dim = 10
+    dropout = 0.3  # 添加dropout参数
 
     def __init__(self):
         super().__init__()
@@ -305,42 +322,41 @@ class MNISTComparer(BasicComparator):
             return correct_rate, loss
 
     def choice(self, idx=0):
-        self.models: list[MNISTModule] = [GRU(self.input_dim, self.hidden_dim, self.output_dim)]
+        self.models: list[MNISTModule] = [TorchGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout)]
         if idx == 0:
             self.models = [
-                GRU(self.input_dim, self.hidden_dim, self.output_dim),
-                TorchGRU(self.input_dim, self.hidden_dim, self.output_dim),
-                NestGRU(self.input_dim, self.hidden_dim, self.output_dim)
+                TorchGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout),
+                NestGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout)
             ]
             pass
         elif idx == 1:
             self.models = []
             for a in range(9, 15):
                 i = int(1.7 ** a)
-                self.models.append(GRU(self.input_dim, i, self.output_dim))
+                self.models.append(TorchGRU(self.input_dim, i, self.output_dim, dropout=self.dropout))
         elif idx == 2:
             for a in range(9, 14):
                 i = int(1.7 ** a)
                 self.models.append(
-                    HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i).set_name(f"HGRU-{i}"))
+                    HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i, dropout=self.dropout).set_name(f"HGRU-{i}"))
         elif idx == 3:
             for a in range(9, 15):
                 i = int(1.7 ** a)
                 self.models.append(
-                    HGRU(self.input_dim, i, self.output_dim, mpl_h=582).set_name(f"HGRU-{i}"))
+                    HGRU(self.input_dim, i, self.output_dim, mpl_h=582, dropout=self.dropout).set_name(f"HGRU-{i}"))
         elif idx == 4:
             for a in range(10, 15):
-                i = int(1.7 ** a)
+                i = int(2 ** a)
                 self.models.append(
-                    NormGRU(self.input_dim, i, self.output_dim).set_name(f"normGRU-{i}"))
+                    NormGRU(self.input_dim, i, self.output_dim, dropout=self.dropout).set_name(f"normGRU-{i}"))
         elif idx == 5:
             for a in range(8, 18):
-                i = int(1.8 ** a)
+                i = int(2 ** a)
                 self.models.append(
-                    NormHGRU(self.input_dim, 640, self.output_dim, mpl_h=i).set_name(f"normHGRU-{i}"))
+                    NormHGRU(self.input_dim, 640, self.output_dim, mpl_h=i, dropout=self.dropout).set_name(f"normHGRU-{i}"))
 
     def run(self):
-        infos = {"数据集": self.data_name, "批大小": self.batch_size, "初始学习率": self.learning_rate}
+        infos = {"数据集": self.data_name, "批大小": self.batch_size, "初始学习率": self.learning_rate, "Dropout": self.dropout}
         model_infos = []
         for model in tqdm(self.models, desc="Module List"):
             # 开始计时

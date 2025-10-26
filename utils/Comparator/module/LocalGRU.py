@@ -3,13 +3,9 @@ from torch import nn
 
 
 class LocalGRU(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size):
         super(LocalGRU, self).__init__()
-        self.name = "localGRU"
-        self.input_size: int = input_size
-        self.hidden_size: int = hidden_size
-        self.output_size: int = output_size
-
+        self.hidden_size:int = hidden_size
         self.r = nn.Linear(input_size + hidden_size, hidden_size)
         self.z = nn.Linear(input_size + hidden_size, hidden_size)
         self.h = nn.Linear(input_size + hidden_size, hidden_size)
@@ -40,8 +36,7 @@ class LocalGRU(nn.Module):
             z = torch.sigmoid(self.z(combined))
 
             # 候选隐藏状态计算
-            reset_hidden = r * hidden
-            combined_reset = torch.cat([x, reset_hidden], dim=1)
+            combined_reset = torch.cat([x, r * hidden], dim=1)
             h_tilde = torch.tanh(self.h(combined_reset))
             
             # 更新隐藏状态

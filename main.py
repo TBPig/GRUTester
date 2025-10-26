@@ -2,15 +2,6 @@ import torch
 import sys
 import argparse
 
-from PyQt5.QtWidgets import QApplication
-
-from utils.Comparator.Basic import BasicComparator
-from utils.Comparator.MNIST import MNISTComparer
-from utils.Comparator.PTB import PTBComparer
-from utils.Comparator.CopyTask import CopyTaskComparer
-from utils.gui import MainWindow
-
-
 def main():
     print(f"cuda:{torch.cuda.is_available()}")
     parser = argparse.ArgumentParser(description='GRU Tester')
@@ -22,10 +13,18 @@ def main():
     args = parser.parse_args()
 
     if args.draw_only:
+        from PyQt5.QtWidgets import QApplication
+        from utils.gui import MainWindow
+
         app = QApplication(sys.argv)
         window = MainWindow()
         window.show()
         sys.exit(app.exec_())
+
+    from utils.Comparator.Basic import BasicComparator
+    from utils.Comparator.MNIST import MNISTComparer
+    from utils.Comparator.PTB import PTBComparer
+    from utils.Comparator.CopyTask import CopyTaskComparer
 
     if args.test == 'PTB':
         c: BasicComparator = PTBComparer()

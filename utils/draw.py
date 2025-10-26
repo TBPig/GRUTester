@@ -76,7 +76,7 @@ def calculate_ylim(data_dict, column, p=0.8):
             best_min, best_max = window_min, window_max
 
     # 添加一些边距使曲线不贴边
-    margin = (best_max - best_min) * 0.05
+    margin = (best_max - best_min) * 0.1
     return best_min - margin, best_max + margin
 
 
@@ -140,6 +140,6 @@ class Draw:
         # 调整子图间距
         plt.tight_layout()
 
-        plt.savefig(os.path.join(folder_path, 'mnist_comparison.png'))
+        plt.savefig(os.path.join(folder_path, 'comparison.png'))
 
         plt.show()

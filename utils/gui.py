@@ -2,8 +2,8 @@ import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QListWidget, 
-                             QSplitter, QFileDialog)
-from PyQt5.QtCore import Qt, QSize
+                             QSplitter)
+from PyQt5.QtCore import Qt
 from utils.draw import Draw
 
 
