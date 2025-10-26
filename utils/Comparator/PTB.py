@@ -28,6 +28,7 @@ from tqdm import tqdm
 
 from utils.MLP import mlp
 from utils.Comparator.Basic import BasicComparator, BasicModule
+from utils.Comparator import module
 
 
 # --- 1. 数据加载与预处理 ---
@@ -146,234 +147,65 @@ class Info:
     INIT_RANGE = 0.1
 
 
-class BasicModule(BasicModule):
+class PTBModule(BasicModule):
     def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, dropout=0.5):
         super().__init__()
         self.name = name
         self.hidden_dim = hidden_dim
 
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.gru = None
         self.dropout = nn.Dropout(dropout)
         self.fc = nn.Linear(hidden_dim, vocab_size)
-
-    def init_weights_common(self):
-        """初始化权重的通用部分"""
         nn.init.uniform_(self.embedding.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
         nn.init.zeros_(self.fc.bias)
         nn.init.uniform_(self.fc.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
 
-    def init_hidden(self, batch_size, device) -> torch.Tensor:
-        # (num_layers, batch, hidden_dim)
-        h = torch.zeros(batch_size, self.hidden_dim, device=device)
-        if self.hidden_dim > 0:
-            h[:, 0] = 1
-        return h
-
     def forward(self, x, hidden):
+        if self.gru is None:
+            # 请先选择gru模型
+            raise NotImplementedError("请先选择gru模型")
+
         # x = self.dropout(self.embedding(x))
         x = self.embedding(x)
-        output = self.special_forward(x, hidden)
-        decoded = self.fc(output)
-
+        outputs, _ = self.gru(x, hidden)
+        decoded = self.fc(outputs)
         return decoded, hidden
-
-    def special_forward(self, x, hidden):
-        raise NotImplementedError("默认实现，子类应重写此方法")
 
     def get_info(self):
         return f"模型{self.name}:hidden_size={self.hidden_dim}"
 
 
-class GRU(BasicModule):
+class GRU(PTBModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.5):
-        super().__init__("Localgru", vocab_size, embedding_dim, hidden_dim, dropout)
-        self.r = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
-        self.z = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
-        self.h = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
-        # 初始化权重
-        self.init_weights()
-
-    def init_weights(self):
-        for linear in [self.r, self.z, self.h]:
-            nn.init.xavier_uniform_(linear.weight, gain=1.0)
-            nn.init.zeros_(linear.bias)
-
-        nn.init.constant_(self.r.bias, -3.0)
-        self.init_weights_common()
-
-    def special_forward(self, x, hidden):
-        batch_size, seq_len, embedding_dim = x.size()
-
-        # 预分配输出张量以提高性能
-        outputs = torch.zeros(batch_size, seq_len, self.hidden_dim, device=x.device, dtype=x.dtype)
-
-        # 检查hidden维度是否匹配
-        if hidden.size(0) != batch_size or hidden.size(1) != self.hidden_dim:
-            raise ValueError(
-                f"Hidden state dimension mismatch. Expected ({batch_size}, {self.hidden_dim}), got {hidden.size()}")
-
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, embedding_dim)
-            combined = torch.cat((x_t, hidden), 1)
-
-            r_t = torch.sigmoid(self.r(combined))  # 重置门
-            z_t = torch.sigmoid(self.z(combined))  # 更新门
-            k = r_t * hidden
-            kx_combined = torch.cat((x_t, k), 1)
-            h_tilde = torch.tanh(self.h(kx_combined))  # 候选状态
-            hidden = (1 - z_t) * hidden + z_t * h_tilde  # 新隐藏状态
-            outputs[:, t, :] = hidden
-
-        return outputs  # (batch_size, seq_len, hidden_dim)
+        super().__init__("LocalGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+        self.gru = module.LocalGRU(embedding_dim, hidden_dim)
 
 
-class TorchGRU(BasicModule):
+class HGRU(PTBModule):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, dropout=0.5):
+        super().__init__("HGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+        self.mpl_h = mpl_h
+        self.gru = module.HGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
+
+    def get_info(self):
+        return f"模型{self.name}:hidden_size={self.hidden_dim},MPL=[2,{self.mpl_h}]"
+
+
+class NormHGRU(PTBModule):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, dropout=0.5):
+        super().__init__("normHGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+        self.mpl_h = mpl_h
+        self.gru = module.NormHGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
+
+    def get_info(self):
+        return f"模型{self.name}:hidden_size={self.hidden_dim},MPL=[2,{self.mpl_h}]"
+
+
+class TorchGRU(PTBModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.5):
         super().__init__("TorchGRU", vocab_size, embedding_dim, hidden_dim, dropout)
-        self.num_layers = num_layers
-
-        self.model = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True)
-        # 初始化权重
-        self.init_weights()
-
-    def init_weights(self):
-        self.init_weights_common()
-
-    def special_forward(self, x, hidden):
-        outputs, hidden = self.model(x, hidden)
-        return outputs
-
-    def init_hidden(self, batch_size, device) -> torch.Tensor:
-        # (num_layers, batch, hidden_dim)
-        h = torch.zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
-        if self.hidden_dim > 0:
-            h[:, 0] = 1
-        return h
-
-
-class NormGRU(BasicModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.5):
-        super().__init__("normGRU", vocab_size, embedding_dim, hidden_dim, dropout)
-        self.h = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
-        self.init_weights()
-
-    def init_weights(self):
-        nn.init.xavier_uniform_(self.h.weight, gain=1.0)
-        nn.init.zeros_(self.h.bias)
-        self.init_weights_common()
-
-    def special_forward(self, x, hidden):
-        batch_size, seq_len, embedding_dim = x.size()
-
-        # 预分配输出张量以提高性能
-        outputs = torch.zeros(batch_size, seq_len, self.hidden_dim, device=x.device, dtype=x.dtype)
-
-        # 检查hidden维度是否匹配
-        if hidden.size(0) != batch_size or hidden.size(1) != self.hidden_dim:
-            raise ValueError(
-                f"Hidden state dimension mismatch. Expected ({batch_size}, {self.hidden_dim}), got {hidden.size()}")
-
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, embedding_dim)
-            combined = torch.cat((x_t, hidden), 1)
-
-            h_tilde = self.h(combined)
-            h = hidden + h_tilde
-            norm = torch.norm(h, dim=1, keepdim=True)
-            hidden = h / norm
-            outputs[:, t, :] = hidden
-
-        return outputs  # (batch_size, seq_len, hidden_dim)
-
-
-class HGRU(BasicModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h, dropout=0.5):
-        super().__init__("HGRU", vocab_size, embedding_dim, hidden_dim, dropout)
-        self.mpl_n = 2
-        self.mpl_h = mpl_h
-
-        self.r = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
-        self.z = nn.Linear(embedding_dim + hidden_dim, hidden_dim)
-        self.h = mlp(embedding_dim + hidden_dim, hidden_dim, self.mpl_n, self.mpl_h)
-        # 初始化权重
-        self.init_weights()
-
-    def init_weights(self):
-        for linear in [self.r, self.z]:
-            nn.init.xavier_uniform_(linear.weight, gain=1.0)
-            nn.init.zeros_(linear.bias)
-
-        nn.init.constant_(self.r.bias, -3.0)
-        self.init_weights_common()
-
-    def special_forward(self, x, hidden):
-        batch_size, seq_len, embedding_dim = x.size()
-
-        # 预分配输出张量以提高性能
-        outputs = torch.zeros(batch_size, seq_len, self.hidden_dim, device=x.device, dtype=x.dtype)
-
-        # 检查hidden维度是否匹配
-        if hidden.size(0) != batch_size or hidden.size(1) != self.hidden_dim:
-            raise ValueError(
-                f"Hidden state dimension mismatch. Expected ({batch_size}, {self.hidden_dim}), got {hidden.size()}")
-
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, embedding_dim)
-            combined = torch.cat((x_t, hidden), 1)
-
-            r_t = torch.sigmoid(self.r(combined))  # 重置门
-            z_t = torch.sigmoid(self.z(combined))  # 更新门
-            k = r_t * hidden
-            kx_combined = torch.cat((x_t, k), 1)
-            h_tilde = torch.tanh(self.h(kx_combined))  # 候选状态
-            hidden = (1 - z_t) * hidden + z_t * h_tilde  # 新隐藏状态
-            outputs[:, t, :] = hidden
-
-        return outputs  # (batch_size, seq_len, hidden_dim)
-
-    def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_dim},MPL=[{self.mpl_n},{self.mpl_h}]"
-
-
-class NormHGRU(BasicModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h, dropout=0.5):
-        super().__init__("normHGRU", vocab_size, embedding_dim, hidden_dim, dropout)
-        self.input_size = vocab_size
-        self.mpl_n = 2
-        self.mpl_h = mpl_h
-
-        self.h = mlp(embedding_dim + hidden_dim, hidden_dim, self.mpl_n, self.mpl_h)
-        # 初始化权重
-        self.init_weights()
-
-    def init_weights(self):
-        self.init_weights_common()
-
-    def special_forward(self, x, hidden):
-        batch_size, seq_len, embedding_dim = x.size()
-
-        # 预分配输出张量以提高性能
-        outputs = torch.zeros(batch_size, seq_len, self.hidden_dim, device=x.device, dtype=x.dtype)
-
-        # 检查hidden维度是否匹配
-        if hidden.size(0) != batch_size or hidden.size(1) != self.hidden_dim:
-            raise ValueError(
-                f"Hidden state dimension mismatch. Expected ({batch_size}, {self.hidden_dim}), got {hidden.size()}")
-
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, embedding_dim)
-            combined = torch.cat((x_t, hidden), 1)
-
-            h_tilde = self.h(combined)
-            h = hidden + h_tilde
-            norm = torch.norm(h, dim=1, keepdim=True)
-            hidden = h / norm
-            outputs[:, t, :] = hidden
-
-        return outputs  # (batch_size, seq_len, hidden_dim)
-
-    def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_dim},MPL_info=[{self.mpl_n},{self.mpl_h}]"
+        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True)
 
 
 def repackage_hidden(h):
@@ -400,11 +232,6 @@ def evaluate(model, data_loader, criterion, device):
         for i, (data, targets) in enumerate(data_loader):
             data = data.to(device)
             targets = targets.to(device)
-
-            # 处理批次
-            batch_size = data.size(0)
-            if hidden is None or hidden.size(1) != batch_size:
-                hidden = model.init_hidden(batch_size, device)
 
             output, hidden = model(data, hidden)
             hidden = repackage_hidden(hidden)
@@ -435,11 +262,6 @@ def train(model, train_loader, criterion, optimizer, device):
     for batch_idx, (data, targets) in enumerate(train_loader):
         data = data.to(device)
         targets = targets.to(device)
-
-        # 处理批次
-        batch_size = data.size(0)
-        if hidden is None or hidden.size(1) != batch_size:
-            hidden = model.init_hidden(batch_size, device)
 
         # 前向传播
         optimizer.zero_grad()  # 清零梯度
@@ -504,12 +326,14 @@ class PTBComparer(BasicComparator):
 
     def choice(self, idx):
         if idx == 0:
-            self.inner_models = [GRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout),
-                                 TorchGRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout)]
+            self.inner_models = [
+                TorchGRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout),
+                GRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout)
+            ]
         elif idx == 1:
             self.inner_models = [
-                GRU(self.vocab_size, self.embedding_dim, hidden_dim, dropout=self.dropout)
-                for hidden_dim in [2000,2500,3000,4000,5000]
+                HGRU(self.vocab_size, self.embedding_dim, 600, mpl_h=144, dropout=self.dropout),
+                NormHGRU(self.vocab_size, self.embedding_dim, 600, mpl_h=144, dropout=self.dropout)
             ]
 
     def run(self):

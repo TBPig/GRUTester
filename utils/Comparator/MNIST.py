@@ -6,8 +6,7 @@ import torchvision
 import torchvision.transforms as transforms
 from tqdm import tqdm
 
-from utils.Comparator.module.LocalGRU import LocalGRU
-from utils.MLP import mlp
+from utils.Comparator import module
 from utils.Comparator.Basic import BasicComparator, BasicModule, Saver
 
 
@@ -20,12 +19,10 @@ class MNISTModule(BasicModule):
         self.dropout_p = dropout
 
         # 添加输出层
+        self.gru = None
         self.fc = nn.Linear(hidden_size, self.output_size)
-        if dropout > 0.0:
-            self.dropout = nn.Dropout(dropout)
-        else:
-            self.dropout = None
-            
+        self.dropout = nn.Dropout(dropout) if dropout > 0.0 else None
+
         init_range = 0.1
         nn.init.uniform_(self.fc.weight, -init_range, init_range)
         nn.init.zeros_(self.fc.bias)
@@ -34,6 +31,17 @@ class MNISTModule(BasicModule):
         """初始化隐藏状态"""
         return torch.zeros(batch_size, self.hidden_size, device=device, dtype=dtype)
 
+    def forward(self, x, hidden=None):
+        if self.gru is None:
+            # 请先选择gru模型
+            raise NotImplementedError("请先选择gru模型")
+
+        gru_out, hidden = self.gru(x, hidden)
+        if self.dropout is not None:
+            gru_out = self.dropout(gru_out)
+        outputs = self.fc(gru_out)
+        return outputs, hidden
+
     def get_info(self):
         base_info = f"模型{self.name}:hidden_size={self.hidden_size}"
         if self.dropout_p > 0:
@@ -41,68 +49,18 @@ class MNISTModule(BasicModule):
         return base_info
 
 
-class NestGRU(MNISTModule):
+class LocalGRU(MNISTModule):
     def __init__(self, input_size: int, hidden_size: int, output_size: int, dropout: float = 0.0):
         super().__init__(input_size, hidden_size, output_size, dropout)
-        self.name = "NestGRU"
-        self.gru = LocalGRU(input_size, hidden_size)
-
-    def forward(self, x, hidden=None):
-        gru_out, hidden = self.gru(x, hidden)
-        if self.dropout is not None:
-            gru_out = self.dropout(gru_out)
-        outputs = self.fc(gru_out)
-        return outputs, hidden
-
-
-class GRU(MNISTModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, dropout: float = 0.0):
-        super().__init__(input_size, hidden_size, output_size, dropout)
-        self.name = "Localgru"
-
-        self.r = nn.Linear(input_size + hidden_size, hidden_size)
-        self.z = nn.Linear(input_size + hidden_size, hidden_size)
-        self.h = nn.Linear(input_size + hidden_size, hidden_size)
-        # 添加输出层
-        for linear in [self.r, self.z, self.h]:
-            nn.init.xavier_uniform_(linear.weight, gain=1.0)
-            nn.init.zeros_(linear.bias)
-        nn.init.constant_(self.r.bias, -1.0)  # 使用更温和的初始化值
-
-    def forward(self, x, hidden=None):
-        batch_size, seq_len, _ = x.size()
-        # 初始化隐藏状态
-        if hidden is None:
-            hidden = self._init_hidden(batch_size, x.device, x.dtype)
-
-        # 预分配outputs张量以提高性能
-        outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
-
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
-
-            reset_update_input = torch.cat((x_t, hidden), dim=1)
-            r = torch.sigmoid(self.r(reset_update_input))  # 重置门 r_t
-            z = torch.sigmoid(self.z(reset_update_input))  # 更新门 z_t
-            combine = torch.cat((x_t, r * hidden), dim=1)
-            h_title = torch.tanh(self.h(combine))  # 候选状态 h_tilde
-
-            # 更新隐藏状态
-            hidden = (1 - z) * hidden + z * h_title
-            outputs[:, t, :] = hidden
-
-        if self.dropout is not None:
-            outputs = self.dropout(outputs)
-        outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
-
-        return outputs, hidden
+        self.name = "LocalGRU"
+        self.gru = module.LocalGRU(input_size, hidden_size)
 
 
 class TorchGRU(MNISTModule):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers=1, batch_first=True, dropout: float = 0.0):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers=1, batch_first=True,
+                 dropout: float = 0.0):
         super().__init__(input_size, hidden_size, output_size, dropout)
         self.name = "TorchGRU"
-        # 使用 PyTorch 的 GRU 层
         self.gru = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -111,14 +69,6 @@ class TorchGRU(MNISTModule):
             dropout=dropout if num_layers > 1 else 0.0  # 只有在多层时才使用dropout
         )
 
-    def forward(self, x, hidden=None):
-        gru_out, hidden = self.gru(x, hidden)  # gru_out: (batch, seq_len, hidden_dim)
-        if self.dropout is not None:
-            gru_out = self.dropout(gru_out)
-        # 应用输出层
-        outputs = self.fc(gru_out)  # (batch_size, seq_len, output_size)
-        return outputs, hidden
-
 
 class HGRU(MNISTModule):
     def __init__(self, input_size: int, hidden_size: int, output_size: int, mpl_n=2, mpl_h=144, dropout: float = 0.0):
@@ -126,35 +76,7 @@ class HGRU(MNISTModule):
         self.name = "HGRU"
         self.mpl_n = mpl_n
         self.mpl_h = mpl_h
-
-        self.r = nn.Linear(input_size + hidden_size, hidden_size)
-        self.z = nn.Linear(input_size + hidden_size, hidden_size)
-        self.h = mlp(input_size + hidden_size, hidden_size, mpl_n, mpl_h)
-
-
-    def forward(self, x, hidden=None):
-        batch_size, seq_len, _ = x.size()
-        if hidden is None:
-            hidden = self._init_hidden(batch_size, x.device, x.dtype)
-
-        outputs = []
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
-            combined = torch.cat((x_t, hidden), 1)
-
-            r = torch.sigmoid(self.r(combined))  # 重置门
-            z = torch.sigmoid(self.z(combined))  # 更新门
-            kx_combined = torch.cat((x_t, r * hidden), 1)
-            h_tilde = torch.tanh(self.h(kx_combined))  # 候选状态
-            hidden = (1 - z) * hidden + z * h_tilde  # 新隐藏状态
-            outputs.append(hidden)
-
-        outputs = torch.stack(outputs, dim=1)  # (batch_size, seq_len, hidden_dim)
-        if self.dropout is not None:
-            outputs = self.dropout(outputs)
-        outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
-
-        return outputs, hidden
+        self.gru = module.HGRU(input_size, hidden_size, mpl_n, mpl_h)
 
     def get_info(self):
         base_info = f"模型{self.name}:hidden_size={self.hidden_size},mlp=[{self.mpl_n},{self.mpl_h}]"
@@ -167,35 +89,7 @@ class NormGRU(MNISTModule):
     def __init__(self, input_size: int, hidden_size: int, output_size: int, dropout: float = 0.0):
         super().__init__(input_size, hidden_size, output_size, dropout)
         self.name = "normGRU"
-        self.h = nn.Linear(input_size + hidden_size, hidden_size)
-        nn.init.xavier_uniform_(self.h.weight, gain=1.0)
-        nn.init.zeros_(self.h.bias)
-
-    def forward(self, x, hidden=None):
-        batch_size, seq_len, _ = x.size()
-        if hidden is None:
-            hidden = self._init_hidden(batch_size, x.device, x.dtype)
-            hidden[:, 0] = 1
-
-        # 预分配outputs张量以提高性能
-        outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
-
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
-
-            combined = torch.cat((x_t, hidden), 1)
-            h_tilde = self.h(combined)
-            h = hidden + h_tilde
-            norm = torch.norm(h, dim=1, keepdim=True)
-            hidden = h / norm
-
-            outputs[:, t, :] = hidden
-
-        if self.dropout is not None:
-            outputs = self.dropout(outputs)
-        outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
-
-        return outputs, hidden
+        self.gru = module.NormGRU(input_size, hidden_size)
 
 
 class NormHGRU(MNISTModule):
@@ -204,29 +98,7 @@ class NormHGRU(MNISTModule):
         self.name = "normHGRU"
         self.mpl_n = mpl_n
         self.mpl_h = mpl_h
-        self.h = mlp(input_size + hidden_size, hidden_size, mpl_n, mpl_h)
-
-    def forward(self, x, hidden=None):
-        batch_size, seq_len, _ = x.size()
-        if hidden is None:
-            hidden = self._init_hidden(batch_size, x.device, x.dtype)
-            hidden[:, 0] = 1
-
-        outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=x.device, dtype=x.dtype)
-        for t in range(seq_len):
-            x_t = x[:, t, :]  # 当前时间步输入 (batch_size, input_size)
-            combined = torch.cat((x_t, hidden), 1)
-            h_tilde = self.h(combined)
-            h = hidden + h_tilde
-            norm = torch.norm(h, dim=1, keepdim=True)
-            hidden = h / norm
-            outputs[:, t, :] = hidden
-
-        if self.dropout is not None:
-            outputs = self.dropout(outputs)
-        outputs = self.fc(outputs)  # (batch_size, seq_len, output_size)
-
-        return outputs, hidden
+        self.gru = module.NormHGRU(input_size, hidden_size, mpl_n, mpl_h)
 
     def get_info(self):
         base_info = f"模型{self.name}:hidden_size={self.hidden_size},mlp=[{self.mpl_n},{self.mpl_h}]"
@@ -322,11 +194,12 @@ class MNISTComparer(BasicComparator):
             return correct_rate, loss
 
     def choice(self, idx=0):
-        self.models: list[MNISTModule] = [TorchGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout)]
+        self.models: list[MNISTModule] = [
+            TorchGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout)]
         if idx == 0:
             self.models = [
                 TorchGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout),
-                NestGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout)
+                LocalGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout)
             ]
             pass
         elif idx == 1:
@@ -338,7 +211,8 @@ class MNISTComparer(BasicComparator):
             for a in range(9, 14):
                 i = int(1.7 ** a)
                 self.models.append(
-                    HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i, dropout=self.dropout).set_name(f"HGRU-{i}"))
+                    HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i, dropout=self.dropout).set_name(
+                        f"HGRU-{i}"))
         elif idx == 3:
             for a in range(9, 15):
                 i = int(1.7 ** a)
@@ -350,13 +224,15 @@ class MNISTComparer(BasicComparator):
                 self.models.append(
                     NormGRU(self.input_dim, i, self.output_dim, dropout=self.dropout).set_name(f"normGRU-{i}"))
         elif idx == 5:
-            for a in range(8, 18):
+            for a in range(8, 16):
                 i = int(2 ** a)
                 self.models.append(
-                    NormHGRU(self.input_dim, 640, self.output_dim, mpl_h=i, dropout=self.dropout).set_name(f"normHGRU-{i}"))
+                    NormHGRU(self.input_dim, 640, self.output_dim, mpl_h=i, dropout=self.dropout).set_name(
+                        f"normHGRU-{i}"))
 
     def run(self):
-        infos = {"数据集": self.data_name, "批大小": self.batch_size, "初始学习率": self.learning_rate, "Dropout": self.dropout}
+        infos = {"数据集": self.data_name, "批大小": self.batch_size, "初始学习率": self.learning_rate,
+                 "Dropout": self.dropout}
         model_infos = []
         for model in tqdm(self.models, desc="Module List"):
             # 开始计时

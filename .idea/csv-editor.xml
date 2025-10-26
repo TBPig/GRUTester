@@ -17,13 +17,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\result\MNIST\20251026-155637\NestGRU.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
       </map>
     </option>
   </component>
