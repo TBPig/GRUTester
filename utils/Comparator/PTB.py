@@ -26,8 +26,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-from utils.MLP import mlp
-from utils.Comparator.Basic import BasicComparator, BasicModule
+from utils.Comparator.Basic import BasicComparator, BasicModule, Saver
 from utils.Comparator import module
 
 
@@ -143,10 +142,6 @@ class PTBDataset(Dataset):
         return torch.tensor(inputs, dtype=torch.long), torch.tensor(targets, dtype=torch.long)
 
 
-class Info:
-    INIT_RANGE = 0.1
-
-
 class PTBModule(BasicModule):
     def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, dropout=0.5):
         super().__init__()
@@ -157,9 +152,11 @@ class PTBModule(BasicModule):
         self.gru = None
         self.dropout = nn.Dropout(dropout)
         self.fc = nn.Linear(hidden_dim, vocab_size)
-        nn.init.uniform_(self.embedding.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
+
+        init_range = 0.1
+        nn.init.uniform_(self.embedding.weight, -init_range, init_range)
+        nn.init.uniform_(self.fc.weight, -init_range, init_range)
         nn.init.zeros_(self.fc.bias)
-        nn.init.uniform_(self.fc.weight, -Info.INIT_RANGE, Info.INIT_RANGE)
 
     def forward(self, x, hidden):
         if self.gru is None:
@@ -174,6 +171,12 @@ class PTBModule(BasicModule):
 
     def get_info(self):
         return f"模型{self.name}:hidden_size={self.hidden_dim}"
+
+
+class TorchGRU(PTBModule):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.5):
+        super().__init__("TorchGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True)
 
 
 class GRU(PTBModule):
@@ -200,12 +203,6 @@ class NormHGRU(PTBModule):
 
     def get_info(self):
         return f"模型{self.name}:hidden_size={self.hidden_dim},MPL=[2,{self.mpl_h}]"
-
-
-class TorchGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.5):
-        super().__init__("TorchGRU", vocab_size, embedding_dim, hidden_dim, dropout)
-        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True)
 
 
 def repackage_hidden(h):
@@ -285,17 +282,12 @@ def train(model, train_loader, criterion, optimizer, device):
         total_loss += loss.item() * targets.numel()
         total_words += targets.numel()
 
-        # 可选：打印进度
-        # if batch_idx % 200 == 0:
-        #     print(f'Batch: {batch_idx}, Loss: {loss.item():.4f}')
-
     avg_train_loss = total_loss / total_words
     avg_train_ppl = math.exp(avg_train_loss)
     return avg_train_loss, avg_train_ppl  # 返回训练损失和困惑度
 
 
 class PTBComparer(BasicComparator):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     data_path = "data/PTB"
     data_name = "PTB"
     sequence_length = 35
@@ -309,7 +301,7 @@ class PTBComparer(BasicComparator):
     def __init__(self):
         super().__init__()
         self.epoch_num = 2
-        self.inner_models = None
+        self.models: list[PTBModule] = []
         # 数据准备
         self.extract_path = maybe_download_and_extract(self.data_path)
         self.train_data, self.valid_data, self.test_data, self.vocab_size, self.word_to_id, self.id_to_word = load_data(
@@ -326,30 +318,39 @@ class PTBComparer(BasicComparator):
 
     def choice(self, idx):
         if idx == 0:
-            self.inner_models = [
+            self.models = [
                 TorchGRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout),
                 GRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout)
             ]
         elif idx == 1:
-            self.inner_models = [
+            self.models = [
                 HGRU(self.vocab_size, self.embedding_dim, 600, mpl_h=144, dropout=self.dropout),
                 NormHGRU(self.vocab_size, self.embedding_dim, 600, mpl_h=144, dropout=self.dropout)
             ]
 
     def run(self):
-        for model in tqdm(self.inner_models, desc="Module List"):
-            model = model.to(self.device)
-            self.run_model(model, self.epoch_num)
+        infos = {"数据集": self.data_name, "批大小": self.batch_size, "初始学习率": self.learning_rate,
+                 "Dropout": self.dropout}
+        model_infos = []
+        for model in tqdm(self.models, desc="Module List"):
+            start_time = time.perf_counter()
 
-    def run_model(self, model, epoch_num):
-        start_time = time.perf_counter()
-        # --- 优化器和损失函数 ---
+            self._train_module(model, self.epoch_num)
+
+            run_time = time.perf_counter() - start_time
+            model_infos.append({"模型名": model.name, "模型属性": model.get_info(), "时间开销": run_time})
+        self.save_info(infos, model_infos)
+
+    def _train_module(self, module, epoch_num):
+        """训练单个模型"""
+        cs = Saver()
+
+        module = module.to(self.device)
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(module.parameters(), lr=self.learning_rate)
 
-        for epoch in tqdm(range(epoch_num)):
-            train_loss, train_ppl = train(model, self.train_loader, criterion, optimizer, self.device)
-            test_loss, test_ppl, cr = evaluate(model, self.test_loader, criterion, self.device)
-
-        end_time = time.perf_counter()
-        run_time = end_time - start_time
+        for i in range(epoch_num):
+            train_loss, train_ppl = train(module, self.train_loader, criterion, optimizer, self.device)
+            test_loss, test_ppl, cr = evaluate(module, self.test_loader, criterion, self.device)
+            cs.add_epoch_data(epoch=i, train_loss=train_loss, test_loss=test_loss, test_acc=cr)
+        self.save_data(cs, module.name)

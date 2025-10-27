@@ -1,6 +1,8 @@
 import os
 import time
 from abc import ABC, abstractmethod
+
+import torch
 from torch import nn
 import pandas as pd
 
@@ -46,8 +48,10 @@ class BasicComparator(ABC):
     """
 
     def __init__(self):
+        self.dataset_root = './data'
         self.id = time.strftime("%Y%m%d-%H%M%S")
         self.data_name = "Basic"
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
 
     @abstractmethod
     def run(self):

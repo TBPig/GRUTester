@@ -80,6 +80,34 @@ def calculate_ylim(data_dict, column, p=0.8):
     return best_min - margin, best_max + margin
 
 
+def get_model_colors(num_models):
+    """
+    根据模型数量获取颜色映射
+    
+    参数:
+    num_models: 模型数量
+    
+    返回:
+    colors: 颜色映射数组
+    """
+    if num_models <= 4:
+        # 使用蓝色渐变
+        colors = plt.cm.Blues(np.linspace(0.3, 0.9, num_models))
+    elif num_models <= 8:
+        # 前4个使用蓝色渐变，其余使用红色渐变
+        blue_colors = plt.cm.Blues(np.linspace(0.2, 0.9, 4))
+        red_colors = plt.cm.Reds(np.linspace(0.2, 0.9, num_models - 4))
+        colors = np.concatenate([blue_colors, red_colors])
+    else:
+        # 前4个使用蓝色渐变，中间4个使用红色渐变，其余使用紫色渐变
+        blue_colors = plt.cm.Blues(np.linspace(0.4, 0.9, 4))
+        red_colors = plt.cm.Reds(np.linspace(0.4, 0.9, 4))
+        purple_colors = plt.cm.Purples(np.linspace(0.4, 0.9, num_models - 8))
+        colors = np.concatenate([blue_colors, red_colors, purple_colors])
+    
+    return colors
+
+
 class Draw:
     def __init__(self):
         self.path = 'result'
@@ -112,7 +140,8 @@ class Draw:
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
         # 为每种曲线准备颜色
-        colors = plt.cm.Blues(np.linspace(0.3, 1, len(data_dict)))
+        num_models = len(data_dict)
+        colors = get_model_colors(num_models)
 
         # 定义绘图参数
         plot_configs = [
@@ -124,7 +153,7 @@ class Draw:
         # 绘制三幅子图
         for ax, config in zip(axes, plot_configs):
             # 计算并设置Y轴范围
-            ylim = calculate_ylim(data_dict, config['column'], p=0.95)
+            ylim = calculate_ylim(data_dict, config['column'], p=0.9)
             if ylim is not None:
                 ax.set_ylim(*ylim)
 

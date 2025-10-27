@@ -3,14 +3,7 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="\result\MNIST\0\Localgru.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\result\MNIST\0\TorchGRU.csv">
+        <entry key="\result\MNIST\20251027-102618\LocalGRU.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

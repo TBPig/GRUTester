@@ -108,21 +108,20 @@ class NormHGRU(MNISTModule):
 
 
 class MNISTComparer(BasicComparator):
-    dataset_root = './data'
     batch_size = 100
-    learning_rate = 1e-4
+    learning_rate = 2e-4
 
     input_dim = 28
     hidden_dim = 640
     output_dim = 10
-    dropout = 0.3  # 添加dropout参数
+    dropout = 0.0  # 添加dropout参数
 
     def __init__(self):
         super().__init__()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
         self.data_name = "MNIST"
         self.models: list[MNISTModule] = []
         self.epoch_num = 40
+        self.goal = "测试目的"
 
         # 初始化数据集和数据加载器
         self.train_dataset = torchvision.datasets.MNIST(root=self.dataset_root, transform=transforms.ToTensor(),
@@ -134,20 +133,6 @@ class MNISTComparer(BasicComparator):
         self.test_loader = torch.utils.data.DataLoader(dataset=self.test_dataset, batch_size=self.batch_size,
                                                        shuffle=False)  # 测试时不需要打乱
         self.batches_num = len(self.train_loader)
-
-    def _train_module(self, module: BasicModule, epoch_num: int):
-        """训练单个模型"""
-        cs = Saver()
-
-        module = module.to(self.device)
-        criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(module.parameters(), lr=self.learning_rate)
-
-        for i in range(epoch_num):
-            train_loss = self._train(module, criterion, optimizer)
-            cr, test_loss = self._test(module, criterion)
-            cs.add_epoch_data(epoch=i, train_loss=train_loss, test_loss=test_loss, test_acc=cr)
-        self.save_data(cs, module.name)
 
     def _train(self, module, criterion, optimizer):
         """执行一次训练步骤"""
@@ -199,45 +184,53 @@ class MNISTComparer(BasicComparator):
         if idx == 0:
             self.models = [
                 TorchGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout),
-                LocalGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout)
+                LocalGRU(self.input_dim, self.hidden_dim, self.output_dim, dropout=self.dropout),
+                NormHGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_n=2, mpl_h=640, dropout=self.dropout)
             ]
-            pass
-        elif idx == 1:
-            self.models = []
-            for a in range(9, 15):
-                i = int(1.7 ** a)
-                self.models.append(TorchGRU(self.input_dim, i, self.output_dim, dropout=self.dropout))
-        elif idx == 2:
-            for a in range(9, 14):
-                i = int(1.7 ** a)
-                self.models.append(
-                    HGRU(self.input_dim, self.hidden_dim, self.output_dim, mpl_h=i, dropout=self.dropout).set_name(
-                        f"HGRU-{i}"))
-        elif idx == 3:
-            for a in range(9, 15):
-                i = int(1.7 ** a)
-                self.models.append(
-                    HGRU(self.input_dim, i, self.output_dim, mpl_h=582, dropout=self.dropout).set_name(f"HGRU-{i}"))
-        elif idx == 4:
-            for a in range(10, 15):
-                i = int(2 ** a)
-                self.models.append(
-                    NormGRU(self.input_dim, i, self.output_dim, dropout=self.dropout).set_name(f"normGRU-{i}"))
+            self.goal = "启用amsgard，并启用学习率调度器，测试模型loss是否震荡"
         elif idx == 5:
-            for a in range(8, 16):
+            for a in range(8, 15):
                 i = int(2 ** a)
                 self.models.append(
-                    NormHGRU(self.input_dim, 640, self.output_dim, mpl_h=i, dropout=self.dropout).set_name(
+                    NormHGRU(self.input_dim, 640, self.output_dim, mpl_n=3, mpl_h=i, dropout=self.dropout).set_name(
                         f"normHGRU-{i}"))
 
     def run(self):
         infos = {"数据集": self.data_name, "批大小": self.batch_size, "初始学习率": self.learning_rate,
-                 "Dropout": self.dropout}
+                 "Dropout": self.dropout, "测试目的": self.goal}
         model_infos = []
         for model in tqdm(self.models, desc="Module List"):
-            # 开始计时
             start_time = time.perf_counter()
+
             self._train_module(model, self.epoch_num)
-            end_time = time.perf_counter()
-            model_infos.append({"模型名": model.name, "模型属性": model.get_info(), "时间开销": end_time - start_time})
+
+            run_time = time.perf_counter() - start_time
+            model_infos.append({"模型名": model.name, "模型属性": model.get_info(), "时间开销": run_time})
         self.save_info(infos, model_infos)
+
+    def _train_module(self, module, epoch_num):
+        """训练单个模型"""
+        cs = Saver()
+
+        module = module.to(self.device)
+        criterion = nn.CrossEntropyLoss()
+        # optimizer = torch.optim.Adam(module.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(
+            module.parameters(),
+            lr=self.learning_rate,
+            betas=(0.9, 0.999),
+            eps=1e-8,
+            weight_decay=0,
+            amsgrad=True
+        )
+
+        # 添加学习率调度器，使用余弦退火衰减
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch_num, eta_min=1e-6)
+
+        for i in range(epoch_num):
+            train_loss = self._train(module, criterion, optimizer)
+            cr, test_loss = self._test(module, criterion)
+            cs.add_epoch_data(epoch=i, train_loss=train_loss, test_loss=test_loss, test_acc=cr)
+            # 更新学习率
+            scheduler.step()
+        self.save_data(cs, module.name)
