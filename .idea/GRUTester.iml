@@ -8,6 +8,7 @@
       <excludeFolder url="file://$MODULE_DIR$/old_result/data" />
       <excludeFolder url="file://$MODULE_DIR$/old_result/img" />
       <excludeFolder url="file://$MODULE_DIR$/result" />
+      <excludeFolder url="file://$MODULE_DIR$/config" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.11 (GRUTester)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

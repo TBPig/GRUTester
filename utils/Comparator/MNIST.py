@@ -224,13 +224,14 @@ class MNISTComparer(BasicComparator):
             amsgrad=True
         )
 
-        # 添加学习率调度器，使用余弦退火衰减
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch_num, eta_min=1e-6)
 
         for i in range(epoch_num):
             train_loss = self._train(module, criterion, optimizer)
             cr, test_loss = self._test(module, criterion)
-            cs.add_epoch_data(epoch=i, train_loss=train_loss, test_loss=test_loss, test_acc=cr)
+            # 获取当前学习率
+            current_lr = scheduler.get_last_lr()[0]
+            cs.add_epoch_data(epoch=i, train_loss=train_loss, test_loss=test_loss, test_acc=cr, learning_rate=current_lr)
             # 更新学习率
             scheduler.step()
         self.save_data(cs, module.name)

@@ -14,7 +14,7 @@ def main():
 
     if args.draw_only:
         from PyQt5.QtWidgets import QApplication
-        from utils.gui import MainWindow
+        from utils.Draw import MainWindow
 
         app = QApplication(sys.argv)
         window = MainWindow()
