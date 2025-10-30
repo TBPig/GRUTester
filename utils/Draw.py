@@ -8,7 +8,7 @@ import pandas as pd
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QListWidget, 
-                             QSplitter, QCheckBox, QGroupBox)
+                             QSplitter, QCheckBox, QGroupBox, QSpinBox, QDoubleSpinBox)
 from PyQt5.QtCore import Qt
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']  # 使用微软雅黑
@@ -116,9 +116,11 @@ def get_model_colors(num_models):
 
 
 class Draw:
-    def __init__(self, selected_options=None):
+    def __init__(self, selected_options=None, group_options=None, data_point_percentage=0.95):
         self.path = 'result'
         self.selected_options = selected_options
+        self.group_options = group_options if group_options is not None else {}
+        self.data_point_percentage = data_point_percentage
 
     def run(self, data_set=None, index=None):
         """
@@ -187,14 +189,22 @@ class Draw:
                 continue
 
             # 计算并设置Y轴范围
-            ylim = calculate_ylim(data_dict, config['column'], p=0.9)
+            ylim = calculate_ylim(data_dict, config['column'], p=self.data_point_percentage)
             if ylim is not None:
                 ax.set_ylim(*ylim)
 
             # 绘制曲线
             for i, (model_name, data) in enumerate(data_dict.items()):
                 if config['column'] in data.columns:
-                    ax.plot(data['epoch'], data[config['column']], label=model_name, color=colors[i])
+                    # 获取分组大小
+                    group_size = self.group_options.get(config['column'], 1)
+                    
+                    # 如果需要分组，则对数据进行分组处理
+                    if group_size > 1:
+                        grouped_x, grouped_y = group(data['epoch'].values, data[config['column']].values, group_size)
+                        ax.plot(grouped_x, grouped_y, label=model_name, color=colors[i])
+                    else:
+                        ax.plot(data['epoch'], data[config['column']], label=model_name, color=colors[i])
             ax.set_title(config['title'])
             ax.set_xlabel('Epoch')
             ax.set_ylabel(config['ylabel'])
@@ -213,7 +223,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GRU测试结果可视化工具")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 1500, 600)
         
         # 图表选项
         self.plot_options = [
@@ -222,6 +232,17 @@ class MainWindow(QMainWindow):
             {'key': 'test_acc', 'label': '测试准确率曲线', 'default': True},
             {'key': 'learning_rate', 'label': '学习率曲线', 'default': True}
         ]
+        
+        # 默认分组大小
+        self.default_group_sizes = {
+            'train_loss': 1,
+            'test_loss': 1,
+            'test_acc': 1,
+            'learning_rate': 1
+        }
+        
+        # 默认数据点百分比
+        self.default_data_point_percentage = 0.95
         
         # 初始化界面
         # 创建主窗口部件
@@ -276,25 +297,69 @@ class MainWindow(QMainWindow):
         options_group = QGroupBox()
         options_group_layout = QVBoxLayout(options_group)
         
-        # 创建复选框
+        # 创建复选框和输入框
         self.option_checkboxes = []
+        self.group_spinboxes = []
         for option in self.plot_options:
+            # 创建水平布局用于放置复选框和输入框
+            option_layout = QHBoxLayout()
+            
+            # 复选框
             checkbox = QCheckBox(option['label'])
             checkbox.setChecked(option['default'])
-            options_group_layout.addWidget(checkbox)
             self.option_checkboxes.append(checkbox)
+            option_layout.addWidget(checkbox)
             
+            # 标签
+            group_label = QLabel("分组:")
+            option_layout.addWidget(group_label)
+            
+            # 数值输入框
+            spinbox = QSpinBox()
+            spinbox.setRange(1, 1000)  # 设置范围1-1000
+            spinbox.setValue(self.default_group_sizes.get(option['key'], 1))
+            self.group_spinboxes.append(spinbox)
+            option_layout.addWidget(spinbox)
+            
+            option_layout.addStretch()  # 添加弹性空间
+            
+            options_group_layout.addLayout(option_layout)
+            
+        # 添加数据点百分比设置
+        percentage_layout = QHBoxLayout()
+        percentage_label = QLabel("数据点百分比:")
+        percentage_layout.addWidget(percentage_label)
+        
+        self.data_point_percentage_spinbox = QDoubleSpinBox()
+        self.data_point_percentage_spinbox.setRange(0.01, 0.99)
+        self.data_point_percentage_spinbox.setSingleStep(0.05)
+        self.data_point_percentage_spinbox.setValue(self.default_data_point_percentage)
+        self.data_point_percentage_spinbox.setDecimals(2)
+        percentage_layout.addWidget(self.data_point_percentage_spinbox)
+        
+        options_group_layout.addLayout(percentage_layout)
+        
         right_layout.addWidget(options_group)
         
         # 操作按钮区域
         button_panel = QWidget()
         button_layout = QVBoxLayout(button_panel)
 
+        # 创建水平布局放置绘图按钮和重置按钮
+        action_buttons_layout = QHBoxLayout()
+        
         # 绘图按钮
         self.draw_button = QPushButton("绘制图表")
         self.draw_button.clicked.connect(self.draw_charts)
         self.draw_button.setEnabled(False)
-        button_layout.addWidget(self.draw_button)
+        action_buttons_layout.addWidget(self.draw_button, 4)  # 比例为4
+
+        # 重置分组按钮
+        self.reset_group_button = QPushButton("重置分组")
+        self.reset_group_button.clicked.connect(self.reset_group_sizes)
+        action_buttons_layout.addWidget(self.reset_group_button, 1)  # 比例为1
+
+        button_layout.addLayout(action_buttons_layout)
 
         # 刷新按钮
         refresh_button = QPushButton("刷新")
@@ -310,7 +375,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(right_panel)
 
         # 设置分割器比例
-        splitter.setSizes([250, 350, 200])
+        splitter.setSizes([250, 500, 200])
 
         # 初始化文件夹列表
         self.refresh_folders()
@@ -386,24 +451,43 @@ class MainWindow(QMainWindow):
                 
                 # 获取选中的选项
                 selected_options = []
+                group_options = {}
                 for i, checkbox in enumerate(self.option_checkboxes):
                     if checkbox.isChecked():
-                        selected_options.append(self.plot_options[i]['key'])
+                        option_key = self.plot_options[i]['key']
+                        selected_options.append(option_key)
+                        # 获取对应的分组大小
+                        group_options[option_key] = self.group_spinboxes[i].value()
+                
+                # 获取数据点百分比
+                data_point_percentage = self.data_point_percentage_spinbox.value()
                 
                 # 使用更新后的Draw类
-                drawer = Draw(selected_options)
+                drawer = Draw(selected_options, group_options, data_point_percentage)
                 drawer.run(self.selected_dataset, self.selected_index)
             except Exception as e:
                 print(f"绘图时出错: {e}")
                 
+    def reset_group_sizes(self):
+        """将所有分组大小重置为1"""
+        for spinbox in self.group_spinboxes:
+            spinbox.setValue(1)
+
     def save_options(self):
         """保存选项到文件"""
         options_state = []
-        for i, checkbox in enumerate(self.option_checkboxes):
+        for i, (checkbox, spinbox) in enumerate(zip(self.option_checkboxes, self.group_spinboxes)):
             options_state.append({
                 'key': self.plot_options[i]['key'],
-                'checked': checkbox.isChecked()
+                'checked': checkbox.isChecked(),
+                'group_size': spinbox.value()
             })
+            
+        # 保存数据点百分比
+        options_state.append({
+            'key': 'data_point_percentage',
+            'value': self.data_point_percentage_spinbox.value()
+        })
             
         try:
             # 确保配置目录存在
@@ -425,10 +509,16 @@ class MainWindow(QMainWindow):
                     
                 # 应用保存的选项
                 for saved_option in options_state:
+                    # 处理常规选项
                     for i, option in enumerate(self.plot_options):
                         if option['key'] == saved_option['key']:
                             self.option_checkboxes[i].setChecked(saved_option['checked'])
+                            if 'group_size' in saved_option:
+                                self.group_spinboxes[i].setValue(saved_option['group_size'])
                             break
+                    # 处理数据点百分比选项
+                    if saved_option['key'] == 'data_point_percentage':
+                        self.data_point_percentage_spinbox.setValue(saved_option['value'])
         except Exception as e:
             print(f"加载选项时出错: {e}")
 
