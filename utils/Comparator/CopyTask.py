@@ -290,44 +290,5 @@ class CopyTaskComparer(BasicComparator):
                 TorchGRU(self.vocab_size, self.embedding_dim, self.hidden_dim)
             ]
 
-    def run(self):
-        """运行比较测试"""
-        for model in tqdm(self.models, desc="Module List"):
-            # 创建训练器和测试器
-            trainer = CopyTaskTrainer(model, self.sequence_length, self.vocab_size)
-            tester = CopyTaskTester(model, self.sequence_length, self.vocab_size)
-
-            # 创建输出对象并记录结果
-            output = Output()
-
-            start_time = time.perf_counter()
-
-            # 每轮训练后进行测试
-            for epoch in tqdm(range(self.epoch_num), desc="Epoches", leave=False):
-                # 训练一个epoch
-                train_loss = trainer.train(self.train_batches, self.batch_size)
-
-                # 测试模型
-                accuracy, loss = tester.test(self.test_batches, self.batch_size)
-
-                # 添加训练信息
-                output.add_train_info(train_loss, epoch + 1)
-
-                # 添加测试信息 (准确率, 损失, epoch)
-                output.add_test_info(accuracy, loss, epoch + 1)
-
-            end_time = time.perf_counter()
-            run_time = end_time - start_time
-
-            output.set_model(model)
-            output.set_time(run_time)
-            output.add_info("sequence_length", self.sequence_length)
-            output.add_info("vocab_size", self.vocab_size)
-            output.add_info("embedding_dim", self.embedding_dim)
-            output.add_info("batch_size", self.batch_size)
-            output.add_info("epoch_num", self.epoch_num)
-
-            self.outputs.append(output)
-
-        _save_test_text("CopyTask")
-        self._save_output()
+    def _train_module(self, tester):
+        pass

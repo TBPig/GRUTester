@@ -3,6 +3,13 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
+        <entry key="\result\MNIST\20251030-153809\TorchGRU-128.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\result\MNIST\3层NormHGRU\normHGRU-1024.csv">
           <value>
             <Attribute>
@@ -24,7 +31,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\result\MNIST\amsgard与学习率调度器\normHGRU.csv">
+        <entry key="\result\MNIST\CNN-2\CNN-1.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

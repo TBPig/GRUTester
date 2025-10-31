@@ -5,10 +5,10 @@ conda activate torch_env
 bsub \
   -n 1 \
   -q gpu \
-  -gpu "num=1" \
-  -R "rusage[mem=6GB]" \
+  -gpu "num=2" \
+  -R "rusage[mem=4GB]" \
   -o task_output.txt \
-  "python main.py --test MNIST --epochs 40 --group 2"
+  "python main.py --test MNIST --epochs 30 --group 1"
 
 // 查看任务
 bjobs

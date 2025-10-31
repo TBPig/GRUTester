@@ -15,7 +15,6 @@
 
 import collections
 import os
-import time
 from typing import Optional
 import numpy as np
 import requests
@@ -24,7 +23,6 @@ import math
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm
 
 from utils.Comparator.Basic import BasicComparator, BasicModule, Saver
 from utils.Comparator import module
@@ -32,12 +30,13 @@ from utils.Comparator import module
 
 # --- 1. 数据加载与预处理 ---
 
-def maybe_download_and_extract(data_path):
+def get_dataset():
     """
     下载并解压PTB数据集
-    :param data_path: 数据集存储路径
     :return: 解压后的数据文件路径
     """
+
+    data_path = "data/PTB"
     # 检查数据路径是否存在，不存在则创建
     if not os.path.exists(data_path):
         os.makedirs(data_path)
@@ -96,7 +95,7 @@ def load_data(data_path):
     valid_data = file_to_word_ids(valid_path, word_to_id)
     test_data = file_to_word_ids(test_path, word_to_id)
 
-    return train_data, valid_data, test_data, word_size, word_to_id, id_to_word
+    return train_data, valid_data, test_data, word_size
 
 
 class PTBDataset(Dataset):
@@ -160,7 +159,6 @@ class PTBModule(BasicModule):
 
     def forward(self, x, hidden):
         if self.gru is None:
-            # 请先选择gru模型
             raise NotImplementedError("请先选择gru模型")
 
         # x = self.dropout(self.embedding(x))
@@ -288,69 +286,54 @@ def train(model, train_loader, criterion, optimizer, device):
 
 
 class PTBComparer(BasicComparator):
-    data_path = "data/PTB"
-    data_name = "PTB"
-    sequence_length = 35
-    batch_size = 20
-    embedding_dim = 200
-    hidden_dim = 200
-    num_layers = 2
-    dropout = 0.2
-    learning_rate = 1e-3
 
     def __init__(self):
         super().__init__()
-        self.epoch_num = 2
-        self.models: list[PTBModule] = []
+        self.data_name = "PTB"
+        self.sequence_length = 35
+        self.batch_size = 20
+        self.embedding_dim = 200
+        self.hidden_dim = 200
+        self.dropout = 0.2
+        self.learning_rate = 1e-3
         # 数据准备
-        self.extract_path = maybe_download_and_extract(self.data_path)
-        self.train_data, self.valid_data, self.test_data, self.vocab_size, self.word_to_id, self.id_to_word = load_data(
-            self.extract_path)
+        self.extract_path = get_dataset()
+        self.train_data, self.valid_data, self.test_data, self.vocab_size = load_data(self.extract_path)
         self.train_dataset = PTBDataset(self.train_data, self.sequence_length)
         self.valid_dataset = PTBDataset(self.valid_data, self.sequence_length)
         self.test_dataset = PTBDataset(self.test_data, self.sequence_length)
-
-        # 注意：对于 stateful RNN，shuffle 应该是 False
-        # drop_last=False 允许最后一个不完整的批次
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False)
         self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False)
         self.test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False)
 
     def choice(self, idx):
         if idx == 0:
-            self.models = [
-                TorchGRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout),
-                GRU(self.vocab_size, self.embedding_dim, 600, dropout=self.dropout)
-            ]
-        elif idx == 1:
-            self.models = [
-                HGRU(self.vocab_size, self.embedding_dim, 600, mpl_h=144, dropout=self.dropout),
-                NormHGRU(self.vocab_size, self.embedding_dim, 600, mpl_h=144, dropout=self.dropout)
-            ]
+            pass
 
-    def run(self):
-        infos = {"数据集": self.data_name, "批大小": self.batch_size, "初始学习率": self.learning_rate,
-                 "Dropout": self.dropout}
-        model_infos = []
-        for model in tqdm(self.models, desc="Module List"):
-            start_time = time.perf_counter()
 
-            self._train_module(model, self.epoch_num)
-
-            run_time = time.perf_counter() - start_time
-            model_infos.append({"模型名": model.name, "模型属性": model.get_info(), "时间开销": run_time})
-        self.save_info(infos, model_infos)
-
-    def _train_module(self, module, epoch_num):
-        """训练单个模型"""
-        cs = Saver()
-
-        module = module.to(self.device)
+    def _train_module(self, tester):
+        module = tester.module.to(self.device)
+        epoch_num = tester.epochs
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(module.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(
+            module.parameters(),
+            lr=self.learning_rate,
+            betas=(0.9, 0.999),
+            eps=1e-8,
+            weight_decay=0,
+            amsgrad=True
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch_num, eta_min=1e-6)
 
+        cs = Saver()
         for i in range(epoch_num):
             train_loss, train_ppl = train(module, self.train_loader, criterion, optimizer, self.device)
             test_loss, test_ppl, cr = evaluate(module, self.test_loader, criterion, self.device)
-            cs.add_epoch_data(epoch=i, train_loss=train_loss, test_loss=test_loss, test_acc=cr)
+            scheduler.step()
+            current_lr = scheduler.get_last_lr()[0]
+            cs.add_epoch_data(epoch=i,
+                              train_loss=train_loss,
+                              test_loss=test_loss,
+                              test_acc=cr,
+                              learning_rate=current_lr)
         self.save_data(cs, module.name)

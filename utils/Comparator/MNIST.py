@@ -1,10 +1,7 @@
-import time
-
 import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
-from tqdm import tqdm
 
 from utils.Comparator import module
 from utils.Comparator.Basic import BasicComparator, BasicModule, Saver
@@ -147,16 +144,13 @@ class CNNModule(BasicModule):
 
 
 class MNISTComparer(BasicComparator):
-    batch_size = 100
-    learning_rate = 2e-4
-    hidden_dim = 640
 
     def __init__(self):
         super().__init__()
         self.data_name = "MNIST"
-        self.models: list[MNISTModule] = []
-        self.epoch_num = 40
-        self.goal = "测试目的"
+        self.batch_size = 100
+        self.hidden_dim = 640
+        self.epoch_num = 30
 
         # 初始化数据集和数据加载器
         self.train_dataset = torchvision.datasets.MNIST(root=self.dataset_root, transform=transforms.ToTensor(),
@@ -207,59 +201,14 @@ class MNISTComparer(BasicComparator):
             return correct_rate, loss
 
     def choice(self, idx=0):
-        self.models: list[MNISTModule] = [
-            TorchGRU(self.hidden_dim)]
         if idx == 0:
-            self.models = [
-                TorchGRU(self.hidden_dim),
-                LocalGRU(self.hidden_dim),
-                NormHGRU(self.hidden_dim, mpl_n=2, mpl_h=640)
-            ]
-            self.goal = "启用amsgard，并启用学习率调度器，测试模型loss是否震荡"
-        elif idx == 1:
-            self.models = [
-                TorchGRU(self.hidden_dim),
-                NormHGRU(self.hidden_dim, mpl_n=2, mpl_h=512),
-                NormHGRU(self.hidden_dim, mpl_n=3, mpl_h=512),
-            ]
-            self.goal = "测试更高层的MLP能否使模型的表现更好"
-        elif idx == 2:
-            self.models = [
-                TorchGRU(self.hidden_dim).set_name("TorchGRU-1"),
-                TorchGRU(self.hidden_dim).set_name("TorchGRU-1"),
-                TorchGRU(self.hidden_dim).set_name("TorchGRU-1"),
-                CNNModule().set_name("CNN-1"),
-                CNNModule().set_name("CNN-2"),
-                CNNModule().set_name("CNN-3"),
-            ]
-            self.goal = "比较GRU和内置ResNet18在MNIST数据集上的表现"
-        elif idx == 5:
-            for a in range(8, 15):
-                i = int(2 ** a)
-                self.models.append(
-                    NormHGRU(640, mpl_n=3, mpl_h=i).set_name(
-                        f"normHGRU-{i}"))
+            self.choice(0)
 
-    def run(self):
-        infos = {"数据集": self.data_name,
-                 "批大小": self.batch_size,
-                 "初始学习率": self.learning_rate,
-                 "测试目的": self.goal}
-        model_infos = []
-        for model in tqdm(self.models, desc="Module List"):
-            start_time = time.perf_counter()
 
-            self._train_module(model, self.epoch_num)
-
-            run_time = time.perf_counter() - start_time
-            model_infos.append({"模型名": model.name, "模型属性": model.get_info(), "时间开销": run_time})
-        self.save_info(infos, model_infos)
-
-    def _train_module(self, module, epoch_num):
+    def _train_module(self, tester):
         """训练单个模型"""
-        cs = Saver()
-
-        module = module.to(self.device)
+        module = tester.module
+        epoch_num = tester.epochs
         criterion = nn.CrossEntropyLoss()
         # optimizer = torch.optim.Adam(module.parameters(), lr=self.learning_rate)
         optimizer = torch.optim.Adam(
@@ -273,16 +222,17 @@ class MNISTComparer(BasicComparator):
 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch_num, eta_min=1e-6)
 
+        cs = Saver()
         for i in range(epoch_num):
             train_loss = self._train(module, criterion, optimizer)
             cr, test_loss = self._test(module, criterion)
-            # 获取当前学习率
+            scheduler.step()
+
             current_lr = scheduler.get_last_lr()[0]
             cs.add_epoch_data(epoch=i,
                               train_loss=train_loss,
                               test_loss=test_loss,
                               test_acc=cr,
                               learning_rate=current_lr)
-            # 更新学习率
-            scheduler.step()
+
         self.save_data(cs, module.name)

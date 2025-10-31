@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import torch
 from torch import nn
 import pandas as pd
+from tqdm import tqdm
 
 
 class Saver:
@@ -34,12 +35,42 @@ class Saver:
         df = pd.DataFrame(self.training_data)
 
         # 确保epoch列在最前面
-        if 'epoch' in df.columns:
+        if 'epoch_num' in df.columns:
             cols = df.columns.tolist()
-            cols.insert(0, cols.pop(cols.index('epoch')))
+            cols.insert(0, cols.pop(cols.index('epoch_num')))
             df = df[cols]
 
         df.to_csv(csv_file_path, index=False, encoding='utf-8')
+
+
+class BasicModule(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.name = 'module'
+
+    def set_name(self, name):
+        self.name = name
+        return self
+
+    def get_info(self):
+        return f"模型{self.name}"
+
+
+class Tester:
+    """
+    测试包装类，用于封装被测试的模型以及可选的自定义训练轮次
+    """
+
+    def __init__(self, module: BasicModule, epochs: int = None):
+        """
+        初始化测试包装类
+
+        Args:
+            module: 被测试的模型
+            epochs: 可选的自定义训练轮次，如果提供则覆盖全局训练轮次
+        """
+        self.module = module
+        self.epochs = epochs
 
 
 class BasicComparator(ABC):
@@ -49,15 +80,35 @@ class BasicComparator(ABC):
 
     def __init__(self):
         self.dataset_root = './data'
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         self.id = time.strftime("%Y%m%d-%H%M%S")
         self.data_name = "Basic"
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 选择设备
+        self.goal = "测试目的"
+
+        self.batch_size = 1
+        self.learning_rate = 2e-4
+        self.epoch_num = 1
+
+        self.tester_list: list[Tester] = []
+
+
+    def run(self):
+        infos = {"数据集": self.data_name,
+                 "批大小": self.batch_size,
+                 "初始学习率": self.learning_rate,
+                 "测试目的": self.goal}
+        model_infos = []
+        for tester in tqdm(self.tester_list, desc="Module List"):
+            start_time = time.perf_counter()
+            self._train_module(tester)
+            run_time = time.perf_counter() - start_time
+            model_infos.append({"模型名": tester.module.name, "模型属性": tester.module.get_info(), "时间开销": run_time})
+        self.save_info(infos, model_infos)
 
     @abstractmethod
-    def run(self):
-        """
-        运行比较逻辑
-        """
+    def _train_module(self, tester: Tester):
+        """训练单个模型"""
         pass
 
     @abstractmethod
@@ -67,7 +118,14 @@ class BasicComparator(ABC):
         """
         pass
 
-    def save_data(self, cs:Saver, name:str):
+    def add_tester(self, model: BasicModule, epochs: int = None):
+        model = model.to(self.device)
+        tester = Tester(model)
+        tester.epochs = epochs if epochs else self.epoch_num
+        self.tester_list.append(tester)
+        return tester
+
+    def save_data(self, cs: Saver, name: str):
         cs.save_results(f'result/{self.data_name}/{self.id}', name)
 
     def save_info(self, infos: dict, module_infos: list[dict]):
@@ -90,16 +148,3 @@ class BasicComparator(ABC):
         # 追加写入文件
         with open(f"result/{self.data_name}/{self.id}/info.txt", "a", encoding="utf-8") as f:
             f.write(info)
-
-
-class BasicModule(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.name = 'module'
-
-    def set_name(self, name):
-        self.name = name
-        return self
-
-    def get_info(self):
-        return f"模型{self.name}"

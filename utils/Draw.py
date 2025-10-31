@@ -132,20 +132,15 @@ class Draw:
         if index is None:
             index = input("请输入模型组编号：")
 
-        # 查找文件夹中的所有CSV文件
-        folder_path = os.path.join(self.path, data_set, index)
-        csv_files = glob.glob(os.path.join(folder_path, "*.csv"))
+        # 关闭之前可能存在的图表
+        plt.close('all')
 
-        if not csv_files:
-            print(f"在文件夹 {folder_path} 中未找到CSV文件")
-            return
+        # 处理单个或多个索引
+        indexes = index if isinstance(index, list) else [index]
 
-        # 读取所有数据
-        data_dict = {}
-        for csv_file in csv_files:
-            # 获取文件名（不含扩展名）作为模型名称
-            model_name = os.path.splitext(os.path.basename(csv_file))[0]
-            data_dict[model_name] = pd.read_csv(csv_file)
+        # 为所有索引收集数据并计算统一的y轴范围
+        all_data_dicts = {}  # 存储每个索引的数据
+        unified_ylim = {}    # 存储每种图表类型的统一y轴范围
 
         # 定义所有可能的绘图配置
         all_plot_configs = [
@@ -165,58 +160,114 @@ class Draw:
         else:
             plot_configs = all_plot_configs
 
-        # 创建图像和子图
-        fig, axes = plt.subplots(1, len(plot_configs), figsize=(6 * len(plot_configs), 5))
-        
-        # 如果只有一个子图，需要特殊处理
-        if len(plot_configs) == 1:
-            axes = [axes]
-        # 如果没有子图，直接返回
-        elif len(plot_configs) == 0:
-            print("没有要绘制的图表")
-            return
+        # 为每个索引收集数据
+        for idx in indexes:
+            # 查找文件夹中的所有CSV文件
+            folder_path = os.path.join(self.path, data_set, idx)
+            csv_files = glob.glob(os.path.join(folder_path, "*.csv"))
 
-        # 为每种曲线准备颜色
-        num_models = len(data_dict)
-        colors = get_model_colors(num_models)
-
-        # 绘制子图
-        for ax, config in zip(axes, plot_configs):
-            # 检查数据中是否包含该列，如果没有则跳过该子图
-            has_column_data = any(config['column'] in data.columns for data in data_dict.values())
-            if not has_column_data:
-                ax.set_visible(False)
+            if not csv_files:
+                print(f"在文件夹 {folder_path} 中未找到CSV文件")
                 continue
 
-            # 计算并设置Y轴范围
-            ylim = calculate_ylim(data_dict, config['column'], p=self.data_point_percentage)
-            if ylim is not None:
-                ax.set_ylim(*ylim)
+            # 读取所有数据
+            data_dict = {}
+            for csv_file in csv_files:
+                # 获取文件名（不含扩展名）作为模型名称
+                model_name = os.path.splitext(os.path.basename(csv_file))[0]
+                data_dict[model_name] = pd.read_csv(csv_file)
+            
+            all_data_dicts[idx] = data_dict
 
-            # 绘制曲线
-            for i, (model_name, data) in enumerate(data_dict.items()):
-                if config['column'] in data.columns:
-                    # 获取分组大小
-                    group_size = self.group_options.get(config['column'], 1)
+        # 为每种图表类型计算统一的y轴范围
+        for config in plot_configs:
+            # 收集所有索引中该类型图表的数据
+            all_values = []
+            for data_dict in all_data_dicts.values():
+                for data in data_dict.values():
+                    if config['column'] in data.columns:
+                        all_values.extend(data[config['column']].tolist())
+            
+            # 计算统一的y轴范围
+            if all_values:
+                all_values = sorted(all_values)
+                n = len(all_values)
+                keep_count = int(n * self.data_point_percentage)
+                
+                min_range = float('inf')
+                best_min, best_max = all_values[0], all_values[-1]
+                
+                for i in range(n - keep_count + 1):
+                    window_min = all_values[i]
+                    window_max = all_values[i + keep_count - 1]
+                    window_range = window_max - window_min
                     
-                    # 如果需要分组，则对数据进行分组处理
-                    if group_size > 1:
-                        grouped_x, grouped_y = group(data['epoch'].values, data[config['column']].values, group_size)
-                        ax.plot(grouped_x, grouped_y, label=model_name, color=colors[i])
-                    else:
-                        ax.plot(data['epoch'], data[config['column']], label=model_name, color=colors[i])
-            ax.set_title(config['title'])
-            ax.set_xlabel('Epoch')
-            ax.set_ylabel(config['ylabel'])
-            ax.legend()
-            ax.grid(True)
+                    if window_range < min_range:
+                        min_range = window_range
+                        best_min, best_max = window_min, window_max
+                
+                margin = (best_max - best_min) * 0.1
+                unified_ylim[config['column']] = (best_min - margin, best_max + margin)
 
-        # 调整子图间距
-        plt.tight_layout()
+        # 为每个索引创建图表
+        for idx in indexes:
+            if idx not in all_data_dicts:
+                continue
+                
+            data_dict = all_data_dicts[idx]
+            
+            # 创建图像和子图
+            fig, axes = plt.subplots(1, len(plot_configs), figsize=(6 * len(plot_configs), 5))
+            
+            # 如果只有一个子图，需要特殊处理
+            if len(plot_configs) == 1:
+                axes = [axes]
+            # 如果没有子图，直接返回
+            elif len(plot_configs) == 0:
+                print("没有要绘制的图表")
+                continue
 
-        plt.savefig(os.path.join(folder_path, 'comparison.png'))
+            # 为每种曲线准备颜色
+            num_models = len(data_dict)
+            colors = get_model_colors(num_models)
 
-        plt.show()
+            # 绘制子图
+            for ax, config in zip(axes, plot_configs):
+                # 检查数据中是否包含该列，如果没有则跳过该子图
+                has_column_data = any(config['column'] in data.columns for data in data_dict.values())
+                if not has_column_data:
+                    ax.set_visible(False)
+                    continue
+
+                # 使用统一的Y轴范围
+                if config['column'] in unified_ylim:
+                    ax.set_ylim(*unified_ylim[config['column']])
+
+                # 绘制曲线
+                for i, (model_name, data) in enumerate(data_dict.items()):
+                    if config['column'] in data.columns:
+                        # 获取分组大小
+                        group_size = self.group_options.get(config['column'], 1)
+                        
+                        # 如果需要分组，则对数据进行分组处理
+                        if group_size > 1:
+                            grouped_x, grouped_y = group(data['epoch'].values, data[config['column']].values, group_size)
+                            ax.plot(grouped_x, grouped_y, label=model_name, color=colors[i])
+                        else:
+                            ax.plot(data['epoch'], data[config['column']], label=model_name, color=colors[i])
+                ax.set_title(config['title'])
+                ax.set_xlabel('Epoch')
+                ax.set_ylabel(config['ylabel'])
+                ax.legend()
+                ax.grid(True)
+
+            # 调整子图间距
+            plt.tight_layout()
+            
+            # 保存并显示图表
+            folder_path = os.path.join(self.path, data_set, idx)
+            plt.savefig(os.path.join(folder_path, 'comparison.png'))
+            plt.show()
 
 
 class MainWindow(QMainWindow):
@@ -224,6 +275,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("GRU测试结果可视化工具")
         self.setGeometry(100, 100, 1500, 600)
+        
+        # 多选模式状态
+        self.multiselect_mode = False
         
         # 图表选项
         self.plot_options = [
@@ -284,6 +338,17 @@ class MainWindow(QMainWindow):
         self.index_list.clicked.connect(self.on_index_selected)
         middle_layout.addWidget(self.index_list)
 
+        # 切换多选模式按钮
+        self.toggle_multiselect_button = QPushButton("启用多选")
+        self.toggle_multiselect_button.clicked.connect(self.toggle_multiselect)
+        middle_layout.addWidget(self.toggle_multiselect_button)
+        
+        # 重命名按钮
+        self.rename_button = QPushButton("重命名")
+        self.rename_button.clicked.connect(self.rename_index)
+        self.rename_button.setEnabled(False)
+        middle_layout.addWidget(self.rename_button)
+        
         # 右侧面板 - 图表选项
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
@@ -387,6 +452,10 @@ class MainWindow(QMainWindow):
         # 加载保存的选项
         self.load_options()
 
+    def closeEvent(self, event):
+        """当窗口关闭时，同时关闭所有matplotlib图表窗口"""
+        plt.close('all')
+        event.accept()
         
     def refresh_folders(self):
         """刷新文件夹列表"""
@@ -414,6 +483,10 @@ class MainWindow(QMainWindow):
         """当数据集被选中时"""
         self.selected_dataset = self.dataset_list.currentItem().text()
         self.load_index_list()
+        # 重置选中的编号
+        self.selected_index = None
+        self.draw_button.setEnabled(False)
+        self.rename_button.setEnabled(False)
         
     def load_index_list(self):
         """加载编号列表"""
@@ -421,6 +494,7 @@ class MainWindow(QMainWindow):
         self.index_list.clear()
         self.selected_index = None
         self.draw_button.setEnabled(False)
+        self.rename_button.setEnabled(False)
         
         # 构建数据集路径
         dataset_path = os.path.join("./result", self.selected_dataset)
@@ -437,11 +511,62 @@ class MainWindow(QMainWindow):
         for index in indexes:
             self.index_list.addItem(index)
             
+        # 重置多选模式
+        self.multiselect_mode = False
+        self.index_list.setSelectionMode(QListWidget.SingleSelection)
+        self.toggle_multiselect_button.setText("启用多选")
+        
     def on_index_selected(self, index):
         """当编号被选中时"""
-        self.selected_index = self.index_list.currentItem().text()
-        self.draw_button.setEnabled(True)
+        selected_items = self.index_list.selectedItems()
+        if selected_items:
+            self.selected_index = [item.text() for item in selected_items]
+            self.draw_button.setEnabled(True)
+            self.rename_button.setEnabled(len(selected_items) == 1)  # 只有当选择一个项目时才启用重命名
+        else:
+            self.selected_index = None
+            self.draw_button.setEnabled(False)
+            self.rename_button.setEnabled(False)
         
+    def rename_index(self):
+        """重命名选中的编号"""
+        if not self.selected_index:
+            return
+            
+        # 获取数据集路径
+        dataset_path = os.path.join("./result", self.selected_dataset)
+        old_index_path = os.path.join(dataset_path, self.selected_index)
+        
+        # 弹出输入对话框获取新名称
+        from PyQt5.QtWidgets import QInputDialog
+        new_name, ok = QInputDialog.getText(self, "重命名", "请输入新的编号名称:", text=self.selected_index)
+        
+        if ok and new_name and new_name != self.selected_index:
+            new_index_path = os.path.join(dataset_path, new_name)
+            
+            # 检查新名称是否已存在
+            if os.path.exists(new_index_path):
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "重命名失败", f"编号 '{new_name}' 已存在！")
+                return
+                
+            try:
+                # 重命名文件夹
+                os.rename(old_index_path, new_index_path)
+                
+                # 更新界面
+                self.selected_index = new_name
+                self.load_index_list()
+                
+                # 重新选择重命名后的项目
+                items = self.index_list.findItems(new_name, Qt.MatchExactly)
+                if items:
+                    self.index_list.setCurrentItem(items[0])
+                    
+            except Exception as e:
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.critical(self, "错误", f"重命名失败: {str(e)}")
+
     def draw_charts(self):
         """绘制图表"""
         if self.selected_dataset and self.selected_index:
@@ -521,6 +646,24 @@ class MainWindow(QMainWindow):
                         self.data_point_percentage_spinbox.setValue(saved_option['value'])
         except Exception as e:
             print(f"加载选项时出错: {e}")
+
+    def toggle_multiselect(self):
+        """切换多选模式"""
+        self.multiselect_mode = not self.multiselect_mode
+        
+        if self.multiselect_mode:
+            self.index_list.setSelectionMode(QListWidget.MultiSelection)
+            self.toggle_multiselect_button.setText("禁用多选")
+        else:
+            self.index_list.setSelectionMode(QListWidget.SingleSelection)
+            self.toggle_multiselect_button.setText("启用多选")
+            # 清除现有选择
+            self.index_list.clearSelection()
+            
+        # 重置选择状态
+        self.selected_index = None
+        self.draw_button.setEnabled(False)
+        self.rename_button.setEnabled(False)
 
 
 def main():
