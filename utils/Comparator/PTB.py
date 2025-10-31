@@ -142,14 +142,15 @@ class PTBDataset(Dataset):
 
 
 class PTBModule(BasicModule):
-    def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, dropout=0.5):
+    def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, dropout=0.0):
         super().__init__()
         self.name = name
         self.hidden_dim = hidden_dim
 
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.gru = None
-        self.dropout = nn.Dropout(dropout)
+        # 只有当dropout大于0时才创建dropout层
+        self.dropout = nn.Dropout(dropout) if dropout > 0.0 else None
         self.fc = nn.Linear(hidden_dim, vocab_size)
 
         init_range = 0.1
@@ -161,8 +162,10 @@ class PTBModule(BasicModule):
         if self.gru is None:
             raise NotImplementedError("请先选择gru模型")
 
-        # x = self.dropout(self.embedding(x))
         x = self.embedding(x)
+        # 只有当dropout_layer存在时才应用dropout
+        if self.dropout is not None:
+            x = self.dropout(x)
         outputs, _ = self.gru(x, hidden)
         decoded = self.fc(outputs)
         return decoded, hidden
@@ -172,19 +175,19 @@ class PTBModule(BasicModule):
 
 
 class TorchGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.5):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.0):
         super().__init__("TorchGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True)
 
 
 class GRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.5):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.0):
         super().__init__("LocalGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.gru = module.LocalGRU(embedding_dim, hidden_dim)
 
 
 class HGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, dropout=0.5):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, dropout=0.0):
         super().__init__("HGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.mpl_h = mpl_h
         self.gru = module.HGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
@@ -194,7 +197,7 @@ class HGRU(PTBModule):
 
 
 class NormHGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, dropout=0.5):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, dropout=0.0):
         super().__init__("normHGRU", vocab_size, embedding_dim, hidden_dim, dropout)
         self.mpl_h = mpl_h
         self.gru = module.NormHGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
@@ -294,7 +297,7 @@ class PTBComparer(BasicComparator):
         self.batch_size = 20
         self.embedding_dim = 200
         self.hidden_dim = 200
-        self.dropout = 0.2
+        self.dropout = 0.0
         self.learning_rate = 1e-3
         # 数据准备
         self.extract_path = get_dataset()
@@ -308,6 +311,7 @@ class PTBComparer(BasicComparator):
 
     def choice(self, idx):
         if idx == 0:
+            self.add_tester(GRU(self.vocab_size, self.embedding_dim, self.hidden_dim, self.dropout))
             pass
 
 

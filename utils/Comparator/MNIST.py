@@ -202,7 +202,11 @@ class MNISTComparer(BasicComparator):
 
     def choice(self, idx=0):
         if idx == 0:
-            self.choice(0)
+            self.add_tester(TorchGRU(512))
+        if idx == 1:
+            for h in [384, 512, 640]:
+                self.add_tester(TorchGRU(h).set_name(f"TorchGRU-{h}"))
+                self.add_tester(LocalGRU(h).set_name(f"LocalGRU-{h}"))
 
 
     def _train_module(self, tester):
@@ -216,7 +220,7 @@ class MNISTComparer(BasicComparator):
             lr=self.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-8,
-            weight_decay=0,
+            weight_decay=1e-4,
             amsgrad=True
         )
 

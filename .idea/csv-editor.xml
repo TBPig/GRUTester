@@ -10,6 +10,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\result\MNIST\20251031-164955\TorchGRU.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\result\MNIST\3层NormHGRU\normHGRU-1024.csv">
           <value>
             <Attribute>
@@ -32,6 +39,27 @@
           </value>
         </entry>
         <entry key="\result\MNIST\CNN-2\CNN-1.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\result\MNIST\hidden-1\TorchGRU-256.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\result\MNIST\hidden-4\TorchGRU-128.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\result\MNIST\hidden-4\TorchGRU-512.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

@@ -8,7 +8,7 @@ bsub \
   -gpu "num=2" \
   -R "rusage[mem=4GB]" \
   -o task_output.txt \
-  "python main.py --test MNIST --epochs 30 --group 1"
+  "python main.py --test MNIST --epochs 150"
 
 // 查看任务
 bjobs

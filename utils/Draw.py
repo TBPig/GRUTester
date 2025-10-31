@@ -8,7 +8,8 @@ import pandas as pd
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QListWidget, 
-                             QSplitter, QCheckBox, QGroupBox, QSpinBox, QDoubleSpinBox)
+                             QSplitter, QCheckBox, QGroupBox, QSpinBox, QDoubleSpinBox,
+                             QTextEdit)
 from PyQt5.QtCore import Qt
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']  # 使用微软雅黑
@@ -274,7 +275,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GRU测试结果可视化工具")
-        self.setGeometry(100, 100, 1500, 600)
+        self.setGeometry(100, 100, 2000, 800)
         
         # 多选模式状态
         self.multiselect_mode = False
@@ -434,13 +435,34 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(button_panel)
         right_layout.addStretch()
 
+        # 最右侧面板 - info.txt 编辑器
+        info_panel = QWidget()
+        info_layout = QVBoxLayout(info_panel)
+        
+        # info.txt 标题
+        info_label = QLabel("实验信息编辑")
+        info_label.setAlignment(Qt.AlignCenter)
+        info_layout.addWidget(info_label)
+        
+        # 文本编辑器
+        self.info_text_edit = QTextEdit()
+        self.info_text_edit.setPlaceholderText("选择一个编号以查看和编辑 info.txt 文件")
+        info_layout.addWidget(self.info_text_edit)
+        
+        # 保存按钮
+        self.save_info_button = QPushButton("保存信息")
+        self.save_info_button.clicked.connect(self.save_info_txt)
+        self.save_info_button.setEnabled(False)
+        info_layout.addWidget(self.save_info_button)
+        
         # 添加面板到分割器
         splitter.addWidget(left_panel)
         splitter.addWidget(middle_panel)
         splitter.addWidget(right_panel)
+        splitter.addWidget(info_panel)
 
         # 设置分割器比例
-        splitter.setSizes([250, 500, 200])
+        splitter.setSizes([150, 400, 200, 600])
 
         # 初始化文件夹列表
         self.refresh_folders()
@@ -520,14 +542,72 @@ class MainWindow(QMainWindow):
         """当编号被选中时"""
         selected_items = self.index_list.selectedItems()
         if selected_items:
-            self.selected_index = [item.text() for item in selected_items]
+            # 当只选择一个项目时，加载info.txt文件
+            if len(selected_items) == 1:
+                self.selected_index = selected_items[0].text()
+                self.load_info_txt()
+                self.save_info_button.setEnabled(True)
+            else:
+                self.selected_index = [item.text() for item in selected_items]
+                self.info_text_edit.clear()
+                self.info_text_edit.setPlaceholderText("请选择单个编号以查看和编辑 info.txt 文件")
+                self.save_info_button.setEnabled(False)
+                
             self.draw_button.setEnabled(True)
             self.rename_button.setEnabled(len(selected_items) == 1)  # 只有当选择一个项目时才启用重命名
         else:
             self.selected_index = None
             self.draw_button.setEnabled(False)
             self.rename_button.setEnabled(False)
+            self.save_info_button.setEnabled(False)
+            self.info_text_edit.clear()
+            self.info_text_edit.setPlaceholderText("选择一个编号以查看和编辑 info.txt 文件")
+    
+    def load_info_txt(self):
+        """加载info.txt文件内容"""
+        if not self.selected_dataset or not self.selected_index:
+            return
+            
+        # 构建info.txt文件路径
+        info_path = os.path.join("./result", self.selected_dataset, self.selected_index, "info.txt")
         
+        # 检查文件是否存在
+        if os.path.exists(info_path):
+            try:
+                with open(info_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    self.info_text_edit.setPlainText(content)
+            except Exception as e:
+                self.info_text_edit.setPlainText(f"无法读取文件: {str(e)}")
+        else:
+            # 如果文件不存在，清空文本框并提供默认提示
+            self.info_text_edit.clear()
+            
+    def save_info_txt(self):
+        """保存info.txt文件内容"""
+        if not self.selected_dataset or not self.selected_index:
+            return
+            
+        # 构建info.txt文件路径
+        info_path = os.path.join("./result", self.selected_dataset, self.selected_index, "info.txt")
+        
+        try:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(info_path), exist_ok=True)
+            
+            # 写入内容
+            content = self.info_text_edit.toPlainText()
+            with open(info_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+                
+            # 显示保存成功的消息
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.information(self, "保存成功", "info.txt 文件已成功保存")
+        except Exception as e:
+            # 显示错误消息
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "保存失败", f"无法保存文件: {str(e)}")
+
     def rename_index(self):
         """重命名选中的编号"""
         if not self.selected_index:
