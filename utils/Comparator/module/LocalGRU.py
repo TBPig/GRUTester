@@ -14,11 +14,17 @@ class LocalGRU(BaseGRU):
         cell.z = nn.Linear(input_size + hidden_size, hidden_size)
         cell.h = nn.Linear(input_size + hidden_size, hidden_size)
         
-        # 初始化权重和偏置
-        for linear in [cell.r, cell.z, cell.h]:
-            nn.init.xavier_uniform_(linear.weight, gain=1.0)
-            nn.init.zeros_(linear.bias)
-        nn.init.constant_(cell.r.bias, -1.0)  # 使用更温和的初始化值
+        # 使用PyTorch GRU默认的初始化策略
+        k = 1.0 / hidden_size
+        sqrt_k = k ** 0.5
+        # 权重初始化
+        nn.init.uniform_(cell.r.weight, -sqrt_k, sqrt_k)
+        nn.init.uniform_(cell.z.weight, -sqrt_k, sqrt_k)
+        nn.init.uniform_(cell.h.weight, -sqrt_k, sqrt_k)
+        # 偏置初始化
+        nn.init.uniform_(cell.r.bias, -sqrt_k, sqrt_k)
+        nn.init.uniform_(cell.z.bias, -sqrt_k, sqrt_k)
+        nn.init.uniform_(cell.h.bias, -sqrt_k, sqrt_k)
         
         return cell
 

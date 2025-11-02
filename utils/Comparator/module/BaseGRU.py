@@ -53,6 +53,9 @@ class BaseGRU(nn.Module):
 
         # 逐层处理
         current_input = inputs
+        # 为避免inplace操作，创建一个新的hidden张量用于存储更新后的状态
+        new_hidden = hidden.clone()
+        
         for layer in range(self.num_layers):
             layer_outputs = torch.empty(batch_size, seq_len, self.hidden_size, device=inputs.device, dtype=inputs.dtype)
             layer_hidden = hidden[layer]
@@ -71,12 +74,12 @@ class BaseGRU(nn.Module):
             else:
                 current_input = layer_outputs
 
-            # 更新该层的最终隐藏状态
-            hidden[layer] = layer_hidden
+            # 更新该层的最终隐藏状态（避免inplace操作）
+            new_hidden[layer] = layer_hidden
 
         # outputs是最后一层的输出
         outputs = current_input
 
         # 修改hidden的形状为[num_layers, batch_size, 1, hidden_size]
-        hidden = hidden.unsqueeze(2)
-        return outputs, hidden
+        new_hidden = new_hidden.unsqueeze(2)
+        return outputs, new_hidden

@@ -210,7 +210,9 @@ def repackage_hidden(h):
     """将隐藏状态从计算图中分离，以防止反向传播穿过整个训练历史。
     这对于 stateful RNN 非常重要。
     """
-    if isinstance(h, torch.Tensor):
+    if h is None:
+        return None
+    elif isinstance(h, torch.Tensor):
         return h.detach()
     else:
         return tuple(repackage_hidden(v) for v in h)
@@ -223,7 +225,7 @@ def evaluate(model, data_loader, criterion, device):
     total_words = 0
     # 注意：这里我们不能依赖 data_loader.batch_size，因为它可能因为 drop_last=False 而变化
     # 我们在循环内部获取实际的 batch_size
-    hidden: Optional[torch.Tensor] = None  # 在循环开始时初始化
+    hidden = None  # 在循环开始时初始化
     correct = 0
 
     with torch.no_grad():  # 禁用梯度计算
@@ -255,7 +257,7 @@ def train(model, train_loader, criterion, optimizer, device):
     model.train()  # 设置为训练模式
     total_loss = 0.
     total_words = 0
-    hidden: Optional[torch.Tensor] = None  # 在循环开始时初始化
+    hidden = None  # 在循环开始时初始化
 
     for batch_idx, (data, targets) in enumerate(train_loader):
         data = data.to(device)
@@ -311,8 +313,7 @@ class PTBComparer(BasicComparator):
 
     def choice(self, idx):
         if idx == 0:
-            self.add_tester(GRU(self.vocab_size, self.embedding_dim, self.hidden_dim, self.dropout))
-            pass
+            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, self.hidden_dim, dropout=self.dropout))
 
 
     def _train_module(self, tester):
