@@ -10,6 +10,14 @@ bsub \
   -o task_output.txt \
   "python main.py --test MNIST --epochs 40 --group 2"
 
+bsub \
+  -n 1 \
+  -q gpu \
+  -gpu "num=2" \
+  -R "rusage[mem=4GB]" \
+  -o task_output.txt \
+  "python main.py --test PTB --epochs 2 --group 0"
+
 // 查看任务
 bjobs
 

@@ -32,7 +32,7 @@ def main():
         'CopyTask': CopyTaskComparer
     }
     c: BasicComparator = comparator_map[args.test]()
-    c.epoch_num = args.epochs
+    c.epochs = args.epochs
     c.choice(args.group)
     c.run()
 

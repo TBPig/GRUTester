@@ -31,6 +31,27 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\result\MNIST\CNN-3\CNN-2.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\result\MNIST\CNN-3\CNN-3.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\result\MNIST\不同num_layer比较-2\TorchGRU-2.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
       </map>
     </option>
   </component>

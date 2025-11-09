@@ -150,7 +150,7 @@ class MNISTComparer(BasicComparator):
         self.data_name = "MNIST"
         self.batch_size = 100
         self.hidden_dim = 640
-        self.epoch_num = 30
+        self.epochs = 30
 
         # 初始化数据集和数据加载器
         self.train_dataset = torchvision.datasets.MNIST(root=self.dataset_root, transform=transforms.ToTensor(),
@@ -202,12 +202,7 @@ class MNISTComparer(BasicComparator):
 
     def choice(self, idx=0):
         if idx == 0:
-            self.add_tester(TorchGRU(512).set_name(f"TorchGRU-{1}"))
-            # self.add_tester(TorchGRU(512).set_name(f"TorchGRU-{2}"))
-            # self.add_tester(TorchGRU(512).set_name(f"TorchGRU-{3}"))
-            self.add_tester(LocalGRU(512).set_name(f"LocalGRU-{1}"))
-            # self.add_tester(LocalGRU(512).set_name(f"LocalGRU-{2}"))
-            # self.add_tester(LocalGRU(512).set_name(f"LocalGRU-{3}"))
+            self.add_tester(TorchGRU(512).set_name(f"TorchGRU"))
         if idx == 1:
             for h in [384, 512, 640]:
                 self.add_tester(TorchGRU(h).set_name(f"TorchGRU-{h}"))
@@ -224,7 +219,6 @@ class MNISTComparer(BasicComparator):
         module = tester.module
         epoch_num = tester.epochs
         criterion = nn.CrossEntropyLoss()
-        # optimizer = torch.optim.Adam(module.parameters(), lr=self.learning_rate)
         optimizer = torch.optim.Adam(
             module.parameters(),
             lr=self.learning_rate,

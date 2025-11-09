@@ -15,7 +15,6 @@
 
 import collections
 import os
-from typing import Optional
 import numpy as np
 import requests
 import tarfile
@@ -142,10 +141,11 @@ class PTBDataset(Dataset):
 
 
 class PTBModule(BasicModule):
-    def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, dropout=0.0):
+    def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int,num_layers=1, dropout=0.0):
         super().__init__()
         self.name = name
         self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
 
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.gru = None
@@ -171,51 +171,39 @@ class PTBModule(BasicModule):
         return decoded, hidden
 
     def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_dim}"
+        return f"模型{self.name}:hidden_size={self.hidden_dim},num_layers={self.num_layers}"
 
 
 class TorchGRU(PTBModule):
     def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.0):
-        super().__init__("TorchGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+        super().__init__("TorchGRU", vocab_size, embedding_dim, hidden_dim, num_layers, dropout)
         self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True)
 
 
 class GRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, dropout=0.0):
-        super().__init__("LocalGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.0):
+        super().__init__("LocalGRU", vocab_size, embedding_dim, hidden_dim, num_layers, dropout)
         self.gru = module.LocalGRU(embedding_dim, hidden_dim)
 
 
 class HGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, dropout=0.0):
-        super().__init__("HGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, num_layers=1, dropout=0.0):
+        super().__init__("HGRU", vocab_size, embedding_dim, hidden_dim, num_layers, dropout)
         self.mpl_h = mpl_h
         self.gru = module.HGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
 
     def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_dim},MPL=[2,{self.mpl_h}]"
+        return super().get_info() + f",MPL=[2,{self.mpl_h}]"
 
 
 class NormHGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, dropout=0.0):
-        super().__init__("normHGRU", vocab_size, embedding_dim, hidden_dim, dropout)
+    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, num_layers=1, dropout=0.0):
+        super().__init__("normHGRU", vocab_size, embedding_dim, hidden_dim, num_layers, dropout)
         self.mpl_h = mpl_h
         self.gru = module.NormHGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
 
     def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_dim},MPL=[2,{self.mpl_h}]"
-
-
-def repackage_hidden(h):
-    """将隐藏状态从计算图中分离，以防止反向传播穿过整个训练历史。
-    这对于 stateful RNN 非常重要。
-    """
-    if h is None:
-        return None
-    elif isinstance(h, torch.Tensor):
-        return h.detach()
-    else:
-        return tuple(repackage_hidden(v) for v in h)
+        return super().get_info() + f",MPL=[2,{self.mpl_h}]"
 
 
 def evaluate(model, data_loader, criterion, device):
@@ -223,18 +211,17 @@ def evaluate(model, data_loader, criterion, device):
     model.eval()  # 设置为评估模式
     total_loss = 0.
     total_words = 0
-    # 注意：这里我们不能依赖 data_loader.batch_size，因为它可能因为 drop_last=False 而变化
-    # 我们在循环内部获取实际的 batch_size
-    hidden = None  # 在循环开始时初始化
     correct = 0
 
     with torch.no_grad():  # 禁用梯度计算
         for i, (data, targets) in enumerate(data_loader):
             data = data.to(device)
             targets = targets.to(device)
-
+            
+            # 每个批次都从零初始化隐藏状态，避免不相关序列间的干扰
+            hidden = None
+            
             output, hidden = model(data, hidden)
-            hidden = repackage_hidden(hidden)
 
             # output: (batch, seq_len, vocab_size) -> (batch * seq_len, vocab_size)
             # targets: (batch, seq_len) -> (batch * seq_len)
@@ -257,18 +244,17 @@ def train(model, train_loader, criterion, optimizer, device):
     model.train()  # 设置为训练模式
     total_loss = 0.
     total_words = 0
-    hidden = None  # 在循环开始时初始化
 
     for batch_idx, (data, targets) in enumerate(train_loader):
         data = data.to(device)
         targets = targets.to(device)
 
+        # 每个批次都从零初始化隐藏状态，避免不相关序列间的干扰
+        hidden = None
+
         # 前向传播
         optimizer.zero_grad()  # 清零梯度
         output, hidden = model(data, hidden)
-
-        # 分离隐藏状态，防止反向传播穿过整个历史
-        hidden = repackage_hidden(hidden)
 
         # 计算损失
         loss = criterion(output.view(-1, model.fc.out_features), targets.view(-1))
@@ -296,7 +282,7 @@ class PTBComparer(BasicComparator):
         super().__init__()
         self.data_name = "PTB"
         self.sequence_length = 35
-        self.batch_size = 20
+        self.batch_size = 50
         self.embedding_dim = 200
         self.hidden_dim = 200
         self.dropout = 0.0
@@ -313,7 +299,9 @@ class PTBComparer(BasicComparator):
 
     def choice(self, idx):
         if idx == 0:
-            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, self.hidden_dim, dropout=self.dropout))
+            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=2 ,dropout=self.dropout))
+            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=3 ,dropout=self.dropout))
+            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=4 ,dropout=self.dropout))
 
 
     def _train_module(self, tester):

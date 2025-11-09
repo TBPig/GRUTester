@@ -84,8 +84,13 @@ def calculate_ylim(data_dict, column, p=0.8):
             best_min, best_max = window_min, window_max
 
     # 添加一些边距使曲线不贴边
-    margin = (best_max - best_min) * 0.1
-    return best_min - margin, best_max + margin
+    # 如果best_min和best_max相等，需要添加一个小的边距以避免设置相同的Y轴限制
+    if best_min == best_max:
+        margin = 0.1 if best_min == 0 else abs(best_min) * 0.1
+        return best_min - margin, best_max + margin
+    else:
+        margin = (best_max - best_min) * 0.1
+        return best_min - margin, best_max + margin
 
 
 def get_model_colors(num_models):
@@ -207,8 +212,13 @@ class Draw:
                         min_range = window_range
                         best_min, best_max = window_min, window_max
                 
-                margin = (best_max - best_min) * 0.1
-                unified_ylim[config['column']] = (best_min - margin, best_max + margin)
+                # 如果best_min和best_max相等，需要添加一个小的边距以避免设置相同的Y轴限制
+                if best_min == best_max:
+                    margin = 0.1 if best_min == 0 else abs(best_min) * 0.1
+                    unified_ylim[config['column']] = (best_min - margin, best_max + margin)
+                else:
+                    margin = (best_max - best_min) * 0.1
+                    unified_ylim[config['column']] = (best_min - margin, best_max + margin)
 
         # 为每个索引创建图表
         for idx in indexes:
@@ -349,6 +359,12 @@ class MainWindow(QMainWindow):
         self.rename_button.clicked.connect(self.rename_index)
         self.rename_button.setEnabled(False)
         middle_layout.addWidget(self.rename_button)
+        
+        # 删除按钮
+        self.delete_button = QPushButton("删除")
+        self.delete_button.clicked.connect(self.delete_index)
+        self.delete_button.setEnabled(False)
+        middle_layout.addWidget(self.delete_button)
         
         # 右侧面板 - 图表选项
         right_panel = QWidget()
@@ -509,6 +525,7 @@ class MainWindow(QMainWindow):
         self.selected_index = None
         self.draw_button.setEnabled(False)
         self.rename_button.setEnabled(False)
+        self.delete_button.setEnabled(False)
         
     def load_index_list(self):
         """加载编号列表"""
@@ -555,10 +572,12 @@ class MainWindow(QMainWindow):
                 
             self.draw_button.setEnabled(True)
             self.rename_button.setEnabled(len(selected_items) == 1)  # 只有当选择一个项目时才启用重命名
+            self.delete_button.setEnabled(True)
         else:
             self.selected_index = None
             self.draw_button.setEnabled(False)
             self.rename_button.setEnabled(False)
+            self.delete_button.setEnabled(False)
             self.save_info_button.setEnabled(False)
             self.info_text_edit.clear()
             self.info_text_edit.setPlaceholderText("选择一个编号以查看和编辑 info.txt 文件")
@@ -646,6 +665,37 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.critical(self, "错误", f"重命名失败: {str(e)}")
+
+    def delete_index(self):
+        """删除选中的编号"""
+        if not self.selected_index:
+            return
+            
+        # 获取数据集路径
+        dataset_path = os.path.join("./result", self.selected_dataset)
+        index_path = os.path.join(dataset_path, self.selected_index)
+        
+        # 确认删除操作
+        from PyQt5.QtWidgets import QMessageBox
+        reply = QMessageBox.question(self, "确认删除", 
+                                   f"确定要删除编号 '{self.selected_index}' 及其所有数据吗？此操作不可撤销！",
+                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # 删除文件夹及其内容
+                import shutil
+                shutil.rmtree(index_path)
+                
+                # 更新界面
+                self.load_index_list()
+                self.info_text_edit.clear()
+                self.save_info_button.setEnabled(False)
+                
+                # 显示删除成功消息
+                QMessageBox.information(self, "删除成功", f"编号 '{self.selected_index}' 已成功删除")
+            except Exception as e:
+                QMessageBox.critical(self, "删除失败", f"删除编号时出错: {str(e)}")
 
     def draw_charts(self):
         """绘制图表"""
@@ -744,6 +794,7 @@ class MainWindow(QMainWindow):
         self.selected_index = None
         self.draw_button.setEnabled(False)
         self.rename_button.setEnabled(False)
+        self.delete_button.setEnabled(False)
 
 
 def main():
