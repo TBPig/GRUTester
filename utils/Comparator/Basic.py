@@ -141,7 +141,7 @@ class BasicComparator(ABC):
 
     def resolve_duplicate_names(self):
         """
-        检测tester_list中是否有tester.module.name是相同的，如果相同，则分别改写为***-1;***-2...的名字
+        检测tester_list中是否有tester.module.name是相同的，如果相同，则分别改写为***-001;***-002...的名字
         """
         # 统计每个名称出现的次数
         name_count = {}
@@ -157,4 +157,5 @@ class BasicComparator(ABC):
                 if name not in name_index:
                     name_index[name] = 0  # 从第一个开始就重命名
                 name_index[name] += 1
-                tester.module.set_name(f"{name}-{name_index[name]}")
+                # 序号补全为三位数
+                tester.module.set_name(f"{name}-{name_index[name]:03d}")

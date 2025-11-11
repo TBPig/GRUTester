@@ -8,12 +8,13 @@ from utils.Comparator.Basic import BasicComparator, BasicModule, Saver
 
 
 class MNISTModule(BasicModule):
-    def __init__(self, hidden_size: int, dropout: float = 0.0):
+    def __init__(self, hidden_size: int, dropout: float = 0.0, num_layers: int = 1):
         super().__init__()
         self.input_size = 28
         self.hidden_size = hidden_size
         self.output_size = 10
         self.dropout_p = dropout
+        self.num_layers = num_layers
 
         # 添加输出层
         self.gru = None
@@ -40,15 +41,16 @@ class MNISTModule(BasicModule):
         return outputs[:, -1, :]
 
     def get_info(self):
-        base_info = f"模型{self.name}:hidden_size={self.hidden_size}"
+        base_info = f"\n模型{self.name}:hidden_size={self.hidden_size}"
+        base_info += f", num_layers={self.num_layers}"
         if self.dropout_p > 0:
-            base_info += f",dropout={self.dropout_p}"
+            base_info += f", dropout={self.dropout_p}"
         return base_info
 
 
 class LocalGRU(MNISTModule):
-    def __init__(self, hidden_size: int, dropout: float = 0.0):
-        super().__init__(hidden_size, dropout)
+    def __init__(self, hidden_size: int, dropout: float = 0.0, num_layers: int = 1):
+        super().__init__(hidden_size, dropout, num_layers)
         self.name = "LocalGRU"
         self.gru = module.LocalGRU(self.input_size, hidden_size)
 
@@ -56,7 +58,7 @@ class LocalGRU(MNISTModule):
 class TorchGRU(MNISTModule):
     def __init__(self, hidden_size: int, num_layers=1, batch_first=True,
                  dropout: float = 0.0):
-        super().__init__(hidden_size, dropout)
+        super().__init__(hidden_size, dropout, num_layers)
         self.name = "TorchGRU"
         self.gru = nn.GRU(
             input_size=self.input_size,
@@ -68,39 +70,37 @@ class TorchGRU(MNISTModule):
 
 
 class HGRU(MNISTModule):
-    def __init__(self, hidden_size: int, mpl_n=2, mpl_h=144, dropout: float = 0.0):
-        super().__init__(hidden_size, dropout)
+    def __init__(self, hidden_size: int, mpl_n=2, mpl_h=144, dropout: float = 0.0, num_layers: int = 1):
+        super().__init__(hidden_size, dropout, num_layers)
         self.name = "HGRU"
         self.mpl_n = mpl_n
         self.mpl_h = mpl_h
         self.gru = module.HGRU(self.input_size, hidden_size, mpl_n, mpl_h)
 
     def get_info(self):
-        base_info = f"模型{self.name}:hidden_size={self.hidden_size},mlp=[{self.mpl_n},{self.mpl_h}]"
-        if self.dropout_p > 0:
-            base_info += f",dropout={self.dropout_p}"
+        base_info = super().get_info()
+        base_info += f", mlp=[{self.mpl_n},{self.mpl_h}]"
         return base_info
 
 
 class NormGRU(MNISTModule):
-    def __init__(self, hidden_size: int, dropout: float = 0.0):
-        super().__init__(hidden_size, dropout)
+    def __init__(self, hidden_size: int, dropout: float = 0.0, num_layers: int = 1):
+        super().__init__(hidden_size, dropout, num_layers)
         self.name = "normGRU"
         self.gru = module.NormGRU(self.input_size, hidden_size)
 
 
 class NormHGRU(MNISTModule):
-    def __init__(self, hidden_size: int, mpl_n=2, mpl_h=144, dropout: float = 0.0):
-        super().__init__(hidden_size, dropout)
+    def __init__(self, hidden_size: int, mpl_n=2, mpl_h=144, dropout: float = 0.0, num_layers: int = 1):
+        super().__init__(hidden_size, dropout, num_layers)
         self.name = "normHGRU"
         self.mpl_n = mpl_n
         self.mpl_h = mpl_h
         self.gru = module.NormHGRU(self.input_size, hidden_size, mpl_n, mpl_h)
 
     def get_info(self):
-        base_info = f"模型{self.name}:hidden_size={self.hidden_size},mlp=[{self.mpl_n},{self.mpl_h}]"
-        if self.dropout_p > 0:
-            base_info += f",dropout={self.dropout_p}"
+        base_info = super().get_info()
+        base_info += f", mlp=[{self.mpl_n},{self.mpl_h}]"
         return base_info
 
 
@@ -202,16 +202,25 @@ class MNISTComparer(BasicComparator):
 
     def choice(self, idx=0):
         if idx == 0:
-            self.add_tester(TorchGRU(512).set_name(f"TorchGRU"))
+            for h in [640, 800, 1024, 1536]:
+                for l in range(1,5):
+                    for d in [0.0,0.2]:
+                        self.add_tester(TorchGRU(hidden_size=h, num_layers=l, dropout=d))
         if idx == 1:
-            for h in [384, 512, 640]:
+            self.epochs = 60
+            for h in [640, 800, 1024, 1536, 2048, 3072]:
                 self.add_tester(TorchGRU(h).set_name(f"TorchGRU-{h}"))
 
         if idx == 2:
-            self.add_tester(TorchGRU(640).set_name(f"TorchGRU-1"))
-            self.add_tester(TorchGRU(640,2).set_name(f"TorchGRU-2"))
-            self.add_tester(NormHGRU(640,mpl_n=2, mpl_h=640).set_name(f"normHGRU-2"))
-            self.add_tester(NormHGRU(640,mpl_n=3, mpl_h=640).set_name(f"NormHGRU-3"))
+            self.epochs = 200
+            self.add_tester(TorchGRU(hidden_size=1536,num_layers=4))
+
+        if idx == 3:
+            self.epochs = 60
+            for h in [1024, 1536]:
+                for l in range(5,8):
+                    for d in [0.0,0.2]:
+                        self.add_tester(TorchGRU(hidden_size=h, num_layers=l, dropout=d))
 
 
     def _train_module(self, tester):

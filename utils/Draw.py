@@ -9,7 +9,7 @@ import pandas as pd
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QListWidget, 
                              QSplitter, QCheckBox, QGroupBox, QSpinBox, QDoubleSpinBox,
-                             QTextEdit)
+                             QTextEdit, QListWidgetItem)
 from PyQt5.QtCore import Qt
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']  # 使用微软雅黑
@@ -122,11 +122,12 @@ def get_model_colors(num_models):
 
 
 class Draw:
-    def __init__(self, selected_options=None, group_options=None, data_point_percentage=0.95):
+    def __init__(self, selected_options=None, group_options=None, data_point_percentage=0.95, selected_models=None):
         self.path = 'result'
         self.selected_options = selected_options
         self.group_options = group_options if group_options is not None else {}
         self.data_point_percentage = data_point_percentage
+        self.selected_models = selected_models  # 添加模型选择参数
 
     def run(self, data_set=None, index=None):
         """
@@ -181,7 +182,9 @@ class Draw:
             for csv_file in csv_files:
                 # 获取文件名（不含扩展名）作为模型名称
                 model_name = os.path.splitext(os.path.basename(csv_file))[0]
-                data_dict[model_name] = pd.read_csv(csv_file)
+                # 如果指定了模型选择，则只加载选中的模型
+                if self.selected_models is None or model_name in self.selected_models:
+                    data_dict[model_name] = pd.read_csv(csv_file)
             
             all_data_dicts[idx] = data_dict
 
@@ -227,8 +230,13 @@ class Draw:
                 
             data_dict = all_data_dicts[idx]
             
+            # 如果没有数据需要绘制，直接返回
+            if not data_dict:
+                print(f"在索引 {idx} 中没有找到需要绘制的模型数据")
+                continue
+            
             # 创建图像和子图
-            fig, axes = plt.subplots(1, len(plot_configs), figsize=(6 * len(plot_configs), 5))
+            fig, axes = plt.subplots(1, len(plot_configs), figsize=(24, 10))
             
             # 如果只有一个子图，需要特殊处理
             if len(plot_configs) == 1:
@@ -366,9 +374,35 @@ class MainWindow(QMainWindow):
         self.delete_button.setEnabled(False)
         middle_layout.addWidget(self.delete_button)
         
-        # 右侧面板 - 图表选项
+        # 右侧面板 - 模型选择和图表选项
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
+        
+        # 模型选择标题
+        model_label = QLabel("模型选择")
+        model_label.setAlignment(Qt.AlignCenter)
+        right_layout.addWidget(model_label)
+        
+        # 模型选择面板
+        model_panel = QGroupBox()
+        model_panel_layout = QVBoxLayout(model_panel)
+        
+        # 全选/取消全选按钮
+        select_buttons_layout = QHBoxLayout()
+        self.select_all_models_button = QPushButton("全选")
+        self.select_all_models_button.clicked.connect(self.select_all_models)
+        self.deselect_all_models_button = QPushButton("取消全选")
+        self.deselect_all_models_button.clicked.connect(self.deselect_all_models)
+        select_buttons_layout.addWidget(self.select_all_models_button)
+        select_buttons_layout.addWidget(self.deselect_all_models_button)
+        model_panel_layout.addLayout(select_buttons_layout)
+        
+        # 模型列表
+        self.model_list = QListWidget()
+        self.model_list.setSelectionMode(QListWidget.MultiSelection)
+        model_panel_layout.addWidget(self.model_list)
+        
+        right_layout.addWidget(model_panel)
         
         # 图表选项标题
         options_label = QLabel("图表选项")
@@ -559,16 +593,18 @@ class MainWindow(QMainWindow):
         """当编号被选中时"""
         selected_items = self.index_list.selectedItems()
         if selected_items:
-            # 当只选择一个项目时，加载info.txt文件
+            # 当只选择一个项目时，加载info.txt文件和模型列表
             if len(selected_items) == 1:
                 self.selected_index = selected_items[0].text()
                 self.load_info_txt()
                 self.save_info_button.setEnabled(True)
+                self.load_model_list()  # 加载模型列表
             else:
                 self.selected_index = [item.text() for item in selected_items]
                 self.info_text_edit.clear()
                 self.info_text_edit.setPlaceholderText("请选择单个编号以查看和编辑 info.txt 文件")
                 self.save_info_button.setEnabled(False)
+                self.model_list.clear()  # 清空模型列表
                 
             self.draw_button.setEnabled(True)
             self.rename_button.setEnabled(len(selected_items) == 1)  # 只有当选择一个项目时才启用重命名
@@ -581,7 +617,59 @@ class MainWindow(QMainWindow):
             self.save_info_button.setEnabled(False)
             self.info_text_edit.clear()
             self.info_text_edit.setPlaceholderText("选择一个编号以查看和编辑 info.txt 文件")
+            self.model_list.clear()  # 清空模型列表
     
+    def load_model_list(self):
+        """加载模型列表"""
+        if not self.selected_dataset or not self.selected_index:
+            return
+            
+        # 清空模型列表
+        self.model_list.clear()
+        
+        # 构建索引路径
+        index_path = os.path.join("./result", self.selected_dataset, self.selected_index)
+        
+        # 检查路径是否存在
+        if not os.path.exists(index_path):
+            return
+            
+        # 获取CSV文件
+        csv_files = glob.glob(os.path.join(index_path, "*.csv"))
+        
+        # 提取模型名称并添加到列表
+        model_names = []
+        for csv_file in csv_files:
+            model_name = os.path.splitext(os.path.basename(csv_file))[0]
+            model_names.append(model_name)
+            
+        # 添加到列表并默认全部选中
+        for model_name in model_names:
+            item = QListWidgetItem(model_name)
+            item.setSelected(True)
+            self.model_list.addItem(item)
+    
+    def select_all_models(self):
+        """全选所有模型"""
+        for i in range(self.model_list.count()):
+            item = self.model_list.item(i)
+            item.setSelected(True)
+    
+    def deselect_all_models(self):
+        """取消全选所有模型"""
+        for i in range(self.model_list.count()):
+            item = self.model_list.item(i)
+            item.setSelected(False)
+            
+    def get_selected_models(self):
+        """获取选中的模型列表"""
+        selected_models = []
+        for i in range(self.model_list.count()):
+            item = self.model_list.item(i)
+            if item.isSelected():
+                selected_models.append(item.text())
+        return selected_models
+
     def load_info_txt(self):
         """加载info.txt文件内容"""
         if not self.selected_dataset or not self.selected_index:
@@ -717,8 +805,15 @@ class MainWindow(QMainWindow):
                 # 获取数据点百分比
                 data_point_percentage = self.data_point_percentage_spinbox.value()
                 
+                # 获取选中的模型
+                selected_models = self.get_selected_models()
+                if not selected_models:
+                    from PyQt5.QtWidgets import QMessageBox
+                    QMessageBox.warning(self, "警告", "请至少选择一个模型进行绘制！")
+                    return
+                
                 # 使用更新后的Draw类
-                drawer = Draw(selected_options, group_options, data_point_percentage)
+                drawer = Draw(selected_options, group_options, data_point_percentage, selected_models)
                 drawer.run(self.selected_dataset, self.selected_index)
             except Exception as e:
                 print(f"绘图时出错: {e}")
@@ -742,6 +837,24 @@ class MainWindow(QMainWindow):
         options_state.append({
             'key': 'data_point_percentage',
             'value': self.data_point_percentage_spinbox.value()
+        })
+        
+        # 保存选中的数据集、编号和模型
+        options_state.append({
+            'key': 'selected_dataset',
+            'value': self.selected_dataset
+        })
+        
+        options_state.append({
+            'key': 'selected_index',
+            'value': self.selected_index
+        })
+        
+        # 保存选中的模型
+        selected_models = self.get_selected_models()
+        options_state.append({
+            'key': 'selected_models',
+            'value': selected_models
         })
             
         try:
@@ -774,6 +887,37 @@ class MainWindow(QMainWindow):
                     # 处理数据点百分比选项
                     if saved_option['key'] == 'data_point_percentage':
                         self.data_point_percentage_spinbox.setValue(saved_option['value'])
+                    # 处理选中的数据集
+                    elif saved_option['key'] == 'selected_dataset':
+                        self.selected_dataset = saved_option['value']
+                    # 处理选中的编号
+                    elif saved_option['key'] == 'selected_index':
+                        self.selected_index = saved_option['value']
+                    # 处理选中的模型
+                    elif saved_option['key'] == 'selected_models':
+                        self.last_selected_models = saved_option['value']
+                
+                # 如果有保存的选中数据集，尝试选中它
+                if self.selected_dataset:
+                    items = self.dataset_list.findItems(self.selected_dataset, Qt.MatchExactly)
+                    if items:
+                        self.dataset_list.setCurrentItem(items[0])
+                        self.load_index_list()
+                        
+                        # 如果有保存的选中编号，尝试选中它
+                        if self.selected_index:
+                            index_items = self.index_list.findItems(self.selected_index, Qt.MatchExactly)
+                            if index_items:
+                                self.index_list.setCurrentItem(index_items[0])
+                                self.load_info_txt()
+                                self.load_model_list()
+                                
+                                # 如果有保存的选中模型，尝试选中它们
+                                if hasattr(self, 'last_selected_models') and self.last_selected_models:
+                                    for i in range(self.model_list.count()):
+                                        item = self.model_list.item(i)
+                                        if item.text() in self.last_selected_models:
+                                            item.setSelected(True)
         except Exception as e:
             print(f"加载选项时出错: {e}")
 
