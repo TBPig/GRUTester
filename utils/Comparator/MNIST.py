@@ -103,46 +103,6 @@ class NormHGRU(MNISTModule):
         base_info += f", mlp=[{self.mpl_n},{self.mpl_h}]"
         return base_info
 
-
-class CNNModule(BasicModule):
-    def __init__(self, dropout: float = 0.0):
-        super().__init__()
-        self.name = "CNN"
-        self.input_size = 28
-        self.output_size = 10
-        self.dropout_p = dropout
-
-        # 使用torchvision内置的ResNet18模型
-        self.model = torchvision.models.resnet18(weights=None)  # 不使用预训练权重
-        # 修改第一层以适应灰度图像（MNIST是单通道图像）
-        self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        # 修改最后一层以适应10个类别（MNIST数字0-9）
-        self.model.fc = nn.Linear(self.model.fc.in_features, 10)
-
-        # 初始化权重（对于最后添加的层）
-        nn.init.kaiming_normal_(self.model.conv1.weight, mode='fan_out', nonlinearity='relu')
-        nn.init.normal_(self.model.fc.weight, 0, 0.01)
-        nn.init.constant_(self.model.fc.bias, 0)
-
-    def forward(self, x):
-        """执行一次训练步骤"""
-        # x shape: (batch_size, 28, 28)
-        # 检查是否已经有通道维度
-        if x.dim() == 3:  # (batch_size, height, width)
-            x = x.unsqueeze(1)  # 添加通道维度 (batch_size, 1, 28, 28)
-        elif x.dim() == 4 and x.shape[1] != 1:  # (batch_size, channels, height, width)但通道数不是1
-            x = x[:, 0:1, :, :]  # 取第一个通道
-        # 如果已经是 (batch_size, 1, 28, 28) 格式，则不需要改变
-        x = self.model(x)
-        return x
-
-    def get_info(self):
-        base_info = f"模型{self.name}"
-        if self.dropout_p > 0:
-            base_info += f",dropout={self.dropout_p}"
-        return base_info
-
-
 class MNISTComparer(BasicComparator):
 
     def __init__(self):
@@ -207,20 +167,25 @@ class MNISTComparer(BasicComparator):
                     for d in [0.0,0.2]:
                         self.add_tester(TorchGRU(hidden_size=h, num_layers=l, dropout=d))
         if idx == 1:
-            self.epochs = 60
-            for h in [640, 800, 1024, 1536, 2048, 3072]:
+            self.goal = "hidden层最优解-2"
+            self.epochs = 80
+            for h in [4096, 5120, 6144, 7168, 8192]:
                 self.add_tester(TorchGRU(h).set_name(f"TorchGRU-{h}"))
 
         if idx == 2:
-            self.epochs = 200
-            self.add_tester(TorchGRU(hidden_size=1536,num_layers=4))
+            self.goal = "测算epoch大致等于多少比较合适"
+            self.add_tester(TorchGRU(hidden_size=1536,num_layers=4), epochs=250)
+            self.add_tester(TorchGRU(hidden_size=1536,num_layers=4), epochs=200)
+            self.add_tester(TorchGRU(hidden_size=1536,num_layers=4), epochs=150)
+            self.add_tester(TorchGRU(hidden_size=1536,num_layers=4), epochs=100)
+            self.add_tester(TorchGRU(hidden_size=1536,num_layers=4), epochs=50)
 
         if idx == 3:
-            self.epochs = 60
-            for h in [1024, 1536]:
-                for l in range(5,8):
-                    for d in [0.0,0.2]:
-                        self.add_tester(TorchGRU(hidden_size=h, num_layers=l, dropout=d))
+            self.goal = "测算epoch大致等于多少比较合适"
+            self.epochs = 80
+            for h in [1024, 2048, 4096, 8192]:
+                for l in range(8,12):
+                    self.add_tester(TorchGRU(hidden_size=h, num_layers=l))
 
 
     def _train_module(self, tester):

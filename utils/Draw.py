@@ -580,8 +580,19 @@ class MainWindow(QMainWindow):
         indexes = [f for f in os.listdir(dataset_path) 
                   if os.path.isdir(os.path.join(dataset_path, f))]
         
-        # 添加到列表
+        # 按修改时间排序，最新的在前
+        indexes_with_time = []
         for index in indexes:
+            folder_path = os.path.join(dataset_path, index)
+            modify_time = os.path.getmtime(folder_path)
+            indexes_with_time.append((index, modify_time))
+        
+        # 按修改时间降序排序（最新的在前）
+        indexes_with_time.sort(key=lambda x: x[1], reverse=True)
+        sorted_indexes = [x[0] for x in indexes_with_time]
+        
+        # 添加到列表
+        for index in sorted_indexes:
             self.index_list.addItem(index)
             
         # 重置多选模式
@@ -807,10 +818,10 @@ class MainWindow(QMainWindow):
                 
                 # 获取选中的模型
                 selected_models = self.get_selected_models()
+                # 如果没有选择任何模型，则默认选择所有模型
                 if not selected_models:
-                    from PyQt5.QtWidgets import QMessageBox
-                    QMessageBox.warning(self, "警告", "请至少选择一个模型进行绘制！")
-                    return
+                    self.select_all_models()
+                    selected_models = self.get_selected_models()
                 
                 # 使用更新后的Draw类
                 drawer = Draw(selected_options, group_options, data_point_percentage, selected_models)
