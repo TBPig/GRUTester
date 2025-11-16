@@ -15,7 +15,23 @@ bsub \
   -gpu "num=2" \
   -R "rusage[mem=4GB]" \
   -o task_output.txt \
+  "python main.py --test MNIST --find"
+
+bsub \
+  -n 1 \
+  -q gpu \
+  -gpu "num=2" \
+  -R "rusage[mem=4GB]" \
+  -o task_output.txt \
   "python main.py --test PTB --group 0"
+
+bsub \
+  -n 1 \
+  -q gpu \
+  -gpu "num=2" \
+  -R "rusage[mem=4GB]" \
+  -o task_output.txt \
+  "python test.py"
 
 // 查看任务         bjobs
 

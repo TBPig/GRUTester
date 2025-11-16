@@ -4,7 +4,7 @@ from utils.Module import BaseModule
 
 
 class PTBModule(nn.Module):
-    def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int,num_layers=1, dropout=0.0):
+    def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, num_layers=1, dropout=0.0):
         super().__init__()
         self.name = name
         self.hidden_dim = hidden_dim

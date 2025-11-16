@@ -3,21 +3,14 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="\result\MNIST\20251116-124235\TorchGRU.csv">
+        <entry key="\result\MNIST\20251116-183535\TorchGRU-epochs=3, hidden=512, layers=2.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\result\MNIST\20251116-125032\TorchGRU.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\result\MNIST\20251116-180515\TorchGRU.csv">
+        <entry key="\result\MNIST\20251116-183535\TorchGRU-epochs=3, hidden=512, layers=3.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

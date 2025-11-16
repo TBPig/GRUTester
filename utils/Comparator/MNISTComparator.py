@@ -27,7 +27,7 @@ class MNISTComparer(BasicComparator):
         if idx == 3:
             self.goal = "测算epoch大致等于多少比较合适"
             for h in [1024, 2048, 4096, 8192]:
-                for l in range(8,12):
+                for l in range(8, 12):
                     self.add_tester(TorchGRU(hidden_size=h, num_layers=l)).set_epochs(80).build()
 
     def add_tester(self, model):

@@ -24,6 +24,7 @@ def save_txt(cp_info, testers_info, path):
 class BasicComparator(ABC):
     def __init__(self):
         self.device = device('cuda' if cuda.is_available() else 'cpu')
+        print(f"device:{self.device}")
 
         self.data_name = "Basic"
         self.goal = ""

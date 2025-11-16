@@ -44,13 +44,12 @@ class MNISTTester(BasicTester):
             current_lr = self.scheduler.get_last_lr()[0]
 
             self.result.add_epoch_data(epoch=i,
-                              train_loss=train_loss,
-                              test_loss=test_loss,
-                              test_acc=cr,
-                              learning_rate=current_lr)
+                                       train_loss=train_loss,
+                                       test_loss=test_loss,
+                                       test_acc=cr,
+                                       learning_rate=current_lr)
             self.final_loss = test_loss
         self.consume_time = time.perf_counter() - t
-
 
     def _train(self):
         """执行一次训练步骤"""

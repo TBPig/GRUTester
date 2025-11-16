@@ -152,10 +152,10 @@ def evaluate(model, data_loader, criterion, device):
         for i, (data, targets) in enumerate(data_loader):
             data = data.to(device)
             targets = targets.to(device)
-            
+
             # 每个批次都从零初始化隐藏状态，避免不相关序列间的干扰
             hidden = None
-            
+
             output, hidden = model(data, hidden)
 
             # output: (batch, seq_len, vocab_size) -> (batch * seq_len, vocab_size)
@@ -240,7 +240,6 @@ class PTBComparer(BasicComparator):
             self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=2, dropout=self.dropout))
             self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=3, dropout=self.dropout))
             self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=4, dropout=self.dropout))
-
 
     def _train_module(self, tester):
         module = tester.module.to(self.device)

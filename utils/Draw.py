@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import glob
 import pandas as pd
 
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QPushButton, QLabel, QListWidget, 
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QPushButton, QLabel, QListWidget,
                              QSplitter, QCheckBox, QGroupBox, QSpinBox, QDoubleSpinBox,
                              QTextEdit, QListWidgetItem)
 from PyQt5.QtCore import Qt
@@ -147,7 +147,7 @@ class Draw:
 
         # 为所有索引收集数据并计算统一的y轴范围
         all_data_dicts = {}  # 存储每个索引的数据
-        unified_ylim = {}    # 存储每种图表类型的统一y轴范围
+        unified_ylim = {}  # 存储每种图表类型的统一y轴范围
 
         # 定义所有可能的绘图配置
         all_plot_configs = [
@@ -156,11 +156,11 @@ class Draw:
             {'column': 'test_acc', 'title': '测试准确率曲线', 'ylabel': 'Test Accuracy'},
             {'column': 'learning_rate', 'title': '学习率曲线', 'ylabel': 'Learning Rate'}
         ]
-        
+
         # 根据选中的选项过滤绘图配置，如果没有指定选项则使用所有配置
         if self.selected_options is not None:
             plot_configs = [config for config in all_plot_configs if config['column'] in self.selected_options]
-            
+
             if not plot_configs:
                 print("没有选中任何图表选项")
                 return
@@ -185,7 +185,7 @@ class Draw:
                 # 如果指定了模型选择，则只加载选中的模型
                 if self.selected_models is None or model_name in self.selected_models:
                     data_dict[model_name] = pd.read_csv(csv_file)
-            
+
             all_data_dicts[idx] = data_dict
 
         # 为每种图表类型计算统一的y轴范围
@@ -196,25 +196,25 @@ class Draw:
                 for data in data_dict.values():
                     if config['column'] in data.columns:
                         all_values.extend(data[config['column']].tolist())
-            
+
             # 计算统一的y轴范围
             if all_values:
                 all_values = sorted(all_values)
                 n = len(all_values)
                 keep_count = int(n * self.data_point_percentage)
-                
+
                 min_range = float('inf')
                 best_min, best_max = all_values[0], all_values[-1]
-                
+
                 for i in range(n - keep_count + 1):
                     window_min = all_values[i]
                     window_max = all_values[i + keep_count - 1]
                     window_range = window_max - window_min
-                    
+
                     if window_range < min_range:
                         min_range = window_range
                         best_min, best_max = window_min, window_max
-                
+
                 # 如果best_min和best_max相等，需要添加一个小的边距以避免设置相同的Y轴限制
                 if best_min == best_max:
                     margin = 0.1 if best_min == 0 else abs(best_min) * 0.1
@@ -227,17 +227,17 @@ class Draw:
         for idx in indexes:
             if idx not in all_data_dicts:
                 continue
-                
+
             data_dict = all_data_dicts[idx]
-            
+
             # 如果没有数据需要绘制，直接返回
             if not data_dict:
                 print(f"在索引 {idx} 中没有找到需要绘制的模型数据")
                 continue
-            
+
             # 创建图像和子图
             fig, axes = plt.subplots(1, len(plot_configs), figsize=(24, 10))
-            
+
             # 如果只有一个子图，需要特殊处理
             if len(plot_configs) == 1:
                 axes = [axes]
@@ -267,10 +267,11 @@ class Draw:
                     if config['column'] in data.columns:
                         # 获取分组大小
                         group_size = self.group_options.get(config['column'], 1)
-                        
+
                         # 如果需要分组，则对数据进行分组处理
                         if group_size > 1:
-                            grouped_x, grouped_y = group(data['epoch'].values, data[config['column']].values, group_size)
+                            grouped_x, grouped_y = group(data['epoch'].values, data[config['column']].values,
+                                                         group_size)
                             ax.plot(grouped_x, grouped_y, label=model_name, color=colors[i])
                         else:
                             ax.plot(data['epoch'], data[config['column']], label=model_name, color=colors[i])
@@ -282,7 +283,7 @@ class Draw:
 
             # 调整子图间距
             plt.tight_layout()
-            
+
             # 保存并显示图表
             folder_path = os.path.join(self.path, data_set, idx)
             plt.savefig(os.path.join(folder_path, 'comparison.png'))
@@ -294,10 +295,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("GRU测试结果可视化工具")
         self.setGeometry(100, 100, 2000, 800)
-        
+
         # 多选模式状态
         self.multiselect_mode = False
-        
+
         # 图表选项
         self.plot_options = [
             {'key': 'train_loss', 'label': '训练损失曲线', 'default': True},
@@ -305,7 +306,7 @@ class MainWindow(QMainWindow):
             {'key': 'test_acc', 'label': '测试准确率曲线', 'default': True},
             {'key': 'learning_rate', 'label': '学习率曲线', 'default': True}
         ]
-        
+
         # 默认分组大小
         self.default_group_sizes = {
             'train_loss': 1,
@@ -313,10 +314,10 @@ class MainWindow(QMainWindow):
             'test_acc': 1,
             'learning_rate': 1
         }
-        
+
         # 默认数据点百分比
         self.default_data_point_percentage = 0.95
-        
+
         # 初始化界面
         # 创建主窗口部件
         main_widget = QWidget()
@@ -361,32 +362,32 @@ class MainWindow(QMainWindow):
         self.toggle_multiselect_button = QPushButton("启用多选")
         self.toggle_multiselect_button.clicked.connect(self.toggle_multiselect)
         middle_layout.addWidget(self.toggle_multiselect_button)
-        
+
         # 重命名按钮
         self.rename_button = QPushButton("重命名")
         self.rename_button.clicked.connect(self.rename_index)
         self.rename_button.setEnabled(False)
         middle_layout.addWidget(self.rename_button)
-        
+
         # 删除按钮
         self.delete_button = QPushButton("删除")
         self.delete_button.clicked.connect(self.delete_index)
         self.delete_button.setEnabled(False)
         middle_layout.addWidget(self.delete_button)
-        
+
         # 右侧面板 - 模型选择和图表选项
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        
+
         # 模型选择标题
         model_label = QLabel("模型选择")
         model_label.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(model_label)
-        
+
         # 模型选择面板
         model_panel = QGroupBox()
         model_panel_layout = QVBoxLayout(model_panel)
-        
+
         # 全选/取消全选按钮
         select_buttons_layout = QHBoxLayout()
         self.select_all_models_button = QPushButton("全选")
@@ -396,74 +397,74 @@ class MainWindow(QMainWindow):
         select_buttons_layout.addWidget(self.select_all_models_button)
         select_buttons_layout.addWidget(self.deselect_all_models_button)
         model_panel_layout.addLayout(select_buttons_layout)
-        
+
         # 模型列表
         self.model_list = QListWidget()
         self.model_list.setSelectionMode(QListWidget.MultiSelection)
         model_panel_layout.addWidget(self.model_list)
-        
+
         right_layout.addWidget(model_panel)
-        
+
         # 图表选项标题
         options_label = QLabel("图表选项")
         options_label.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(options_label)
-        
+
         # 图表选项组
         options_group = QGroupBox()
         options_group_layout = QVBoxLayout(options_group)
-        
+
         # 创建复选框和输入框
         self.option_checkboxes = []
         self.group_spinboxes = []
         for option in self.plot_options:
             # 创建水平布局用于放置复选框和输入框
             option_layout = QHBoxLayout()
-            
+
             # 复选框
             checkbox = QCheckBox(option['label'])
             checkbox.setChecked(option['default'])
             self.option_checkboxes.append(checkbox)
             option_layout.addWidget(checkbox)
-            
+
             # 标签
             group_label = QLabel("分组:")
             option_layout.addWidget(group_label)
-            
+
             # 数值输入框
             spinbox = QSpinBox()
             spinbox.setRange(1, 1000)  # 设置范围1-1000
             spinbox.setValue(self.default_group_sizes.get(option['key'], 1))
             self.group_spinboxes.append(spinbox)
             option_layout.addWidget(spinbox)
-            
+
             option_layout.addStretch()  # 添加弹性空间
-            
+
             options_group_layout.addLayout(option_layout)
-            
+
         # 添加数据点百分比设置
         percentage_layout = QHBoxLayout()
         percentage_label = QLabel("数据点百分比:")
         percentage_layout.addWidget(percentage_label)
-        
+
         self.data_point_percentage_spinbox = QDoubleSpinBox()
         self.data_point_percentage_spinbox.setRange(0.01, 0.99)
         self.data_point_percentage_spinbox.setSingleStep(0.05)
         self.data_point_percentage_spinbox.setValue(self.default_data_point_percentage)
         self.data_point_percentage_spinbox.setDecimals(2)
         percentage_layout.addWidget(self.data_point_percentage_spinbox)
-        
+
         options_group_layout.addLayout(percentage_layout)
-        
+
         right_layout.addWidget(options_group)
-        
+
         # 操作按钮区域
         button_panel = QWidget()
         button_layout = QVBoxLayout(button_panel)
 
         # 创建水平布局放置绘图按钮和重置按钮
         action_buttons_layout = QHBoxLayout()
-        
+
         # 绘图按钮
         self.draw_button = QPushButton("绘制图表")
         self.draw_button.clicked.connect(self.draw_charts)
@@ -488,23 +489,23 @@ class MainWindow(QMainWindow):
         # 最右侧面板 - info.txt 编辑器
         info_panel = QWidget()
         info_layout = QVBoxLayout(info_panel)
-        
+
         # info.txt 标题
         info_label = QLabel("实验信息编辑")
         info_label.setAlignment(Qt.AlignCenter)
         info_layout.addWidget(info_label)
-        
+
         # 文本编辑器
         self.info_text_edit = QTextEdit()
         self.info_text_edit.setPlaceholderText("选择一个编号以查看和编辑 info.txt 文件")
         info_layout.addWidget(self.info_text_edit)
-        
+
         # 保存按钮
         self.save_info_button = QPushButton("保存信息")
         self.save_info_button.clicked.connect(self.save_info_txt)
         self.save_info_button.setEnabled(False)
         info_layout.addWidget(self.save_info_button)
-        
+
         # 添加面板到分割器
         splitter.addWidget(left_panel)
         splitter.addWidget(middle_panel)
@@ -516,11 +517,11 @@ class MainWindow(QMainWindow):
 
         # 初始化文件夹列表
         self.refresh_folders()
-        
+
         # 存储选择的数据
         self.selected_dataset = None
         self.selected_index = None
-        
+
         # 加载保存的选项
         self.load_options()
 
@@ -528,7 +529,7 @@ class MainWindow(QMainWindow):
         """当窗口关闭时，同时关闭所有matplotlib图表窗口"""
         plt.close('all')
         event.accept()
-        
+
     def refresh_folders(self):
         """刷新文件夹列表"""
         # 清空列表
@@ -537,20 +538,20 @@ class MainWindow(QMainWindow):
         self.selected_dataset = None
         self.selected_index = None
         self.draw_button.setEnabled(False)
-        
+
         # 检查result目录是否存在
         result_path = "./result"
         if not os.path.exists(result_path):
             return
-            
+
         # 获取数据集文件夹
-        datasets = [f for f in os.listdir(result_path) 
-                   if os.path.isdir(os.path.join(result_path, f))]
-        
+        datasets = [f for f in os.listdir(result_path)
+                    if os.path.isdir(os.path.join(result_path, f))]
+
         # 添加到列表
         for dataset in datasets:
             self.dataset_list.addItem(dataset)
-            
+
     def on_dataset_selected(self, index):
         """当数据集被选中时"""
         self.selected_dataset = self.dataset_list.currentItem().text()
@@ -560,7 +561,7 @@ class MainWindow(QMainWindow):
         self.draw_button.setEnabled(False)
         self.rename_button.setEnabled(False)
         self.delete_button.setEnabled(False)
-        
+
     def load_index_list(self):
         """加载编号列表"""
         # 清空编号列表
@@ -568,38 +569,38 @@ class MainWindow(QMainWindow):
         self.selected_index = None
         self.draw_button.setEnabled(False)
         self.rename_button.setEnabled(False)
-        
+
         # 构建数据集路径
         dataset_path = os.path.join("./result", self.selected_dataset)
-        
+
         # 检查路径是否存在
         if not os.path.exists(dataset_path):
             return
-            
+
         # 获取编号文件夹
-        indexes = [f for f in os.listdir(dataset_path) 
-                  if os.path.isdir(os.path.join(dataset_path, f))]
-        
+        indexes = [f for f in os.listdir(dataset_path)
+                   if os.path.isdir(os.path.join(dataset_path, f))]
+
         # 按修改时间排序，最新的在前
         indexes_with_time = []
         for index in indexes:
             folder_path = os.path.join(dataset_path, index)
             modify_time = os.path.getmtime(folder_path)
             indexes_with_time.append((index, modify_time))
-        
+
         # 按修改时间降序排序（最新的在前）
         indexes_with_time.sort(key=lambda x: x[1], reverse=True)
         sorted_indexes = [x[0] for x in indexes_with_time]
-        
+
         # 添加到列表
         for index in sorted_indexes:
             self.index_list.addItem(index)
-            
+
         # 重置多选模式
         self.multiselect_mode = False
         self.index_list.setSelectionMode(QListWidget.SingleSelection)
         self.toggle_multiselect_button.setText("启用多选")
-        
+
     def on_index_selected(self, index):
         """当编号被选中时"""
         selected_items = self.index_list.selectedItems()
@@ -616,7 +617,7 @@ class MainWindow(QMainWindow):
                 self.info_text_edit.setPlaceholderText("请选择单个编号以查看和编辑 info.txt 文件")
                 self.save_info_button.setEnabled(False)
                 self.model_list.clear()  # 清空模型列表
-                
+
             self.draw_button.setEnabled(True)
             self.rename_button.setEnabled(len(selected_items) == 1)  # 只有当选择一个项目时才启用重命名
             self.delete_button.setEnabled(True)
@@ -629,49 +630,49 @@ class MainWindow(QMainWindow):
             self.info_text_edit.clear()
             self.info_text_edit.setPlaceholderText("选择一个编号以查看和编辑 info.txt 文件")
             self.model_list.clear()  # 清空模型列表
-    
+
     def load_model_list(self):
         """加载模型列表"""
         if not self.selected_dataset or not self.selected_index:
             return
-            
+
         # 清空模型列表
         self.model_list.clear()
-        
+
         # 构建索引路径
         index_path = os.path.join("./result", self.selected_dataset, self.selected_index)
-        
+
         # 检查路径是否存在
         if not os.path.exists(index_path):
             return
-            
+
         # 获取CSV文件
         csv_files = glob.glob(os.path.join(index_path, "*.csv"))
-        
+
         # 提取模型名称并添加到列表
         model_names = []
         for csv_file in csv_files:
             model_name = os.path.splitext(os.path.basename(csv_file))[0]
             model_names.append(model_name)
-            
+
         # 添加到列表并默认全部选中
         for model_name in model_names:
             item = QListWidgetItem(model_name)
             item.setSelected(True)
             self.model_list.addItem(item)
-    
+
     def select_all_models(self):
         """全选所有模型"""
         for i in range(self.model_list.count()):
             item = self.model_list.item(i)
             item.setSelected(True)
-    
+
     def deselect_all_models(self):
         """取消全选所有模型"""
         for i in range(self.model_list.count()):
             item = self.model_list.item(i)
             item.setSelected(False)
-            
+
     def get_selected_models(self):
         """获取选中的模型列表"""
         selected_models = []
@@ -685,10 +686,10 @@ class MainWindow(QMainWindow):
         """加载info.txt文件内容"""
         if not self.selected_dataset or not self.selected_index:
             return
-            
+
         # 构建info.txt文件路径
         info_path = os.path.join("./result", self.selected_dataset, self.selected_index, "info.txt")
-        
+
         # 检查文件是否存在
         if os.path.exists(info_path):
             try:
@@ -700,24 +701,24 @@ class MainWindow(QMainWindow):
         else:
             # 如果文件不存在，清空文本框并提供默认提示
             self.info_text_edit.clear()
-            
+
     def save_info_txt(self):
         """保存info.txt文件内容"""
         if not self.selected_dataset or not self.selected_index:
             return
-            
+
         # 构建info.txt文件路径
         info_path = os.path.join("./result", self.selected_dataset, self.selected_index, "info.txt")
-        
+
         try:
             # 确保目录存在
             os.makedirs(os.path.dirname(info_path), exist_ok=True)
-            
+
             # 写入内容
             content = self.info_text_edit.toPlainText()
             with open(info_path, 'w', encoding='utf-8') as f:
                 f.write(content)
-                
+
             # 显示保存成功的消息
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.information(self, "保存成功", "info.txt 文件已成功保存")
@@ -730,37 +731,37 @@ class MainWindow(QMainWindow):
         """重命名选中的编号"""
         if not self.selected_index:
             return
-            
+
         # 获取数据集路径
         dataset_path = os.path.join("./result", self.selected_dataset)
         old_index_path = os.path.join(dataset_path, self.selected_index)
-        
+
         # 弹出输入对话框获取新名称
         from PyQt5.QtWidgets import QInputDialog
         new_name, ok = QInputDialog.getText(self, "重命名", "请输入新的编号名称:", text=self.selected_index)
-        
+
         if ok and new_name and new_name != self.selected_index:
             new_index_path = os.path.join(dataset_path, new_name)
-            
+
             # 检查新名称是否已存在
             if os.path.exists(new_index_path):
                 from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self, "重命名失败", f"编号 '{new_name}' 已存在！")
                 return
-                
+
             try:
                 # 重命名文件夹
                 os.rename(old_index_path, new_index_path)
-                
+
                 # 更新界面
                 self.selected_index = new_name
                 self.load_index_list()
-                
+
                 # 重新选择重命名后的项目
                 items = self.index_list.findItems(new_name, Qt.MatchExactly)
                 if items:
                     self.index_list.setCurrentItem(items[0])
-                    
+
             except Exception as e:
                 from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.critical(self, "错误", f"重命名失败: {str(e)}")
@@ -769,28 +770,28 @@ class MainWindow(QMainWindow):
         """删除选中的编号"""
         if not self.selected_index:
             return
-            
+
         # 获取数据集路径
         dataset_path = os.path.join("./result", self.selected_dataset)
         index_path = os.path.join(dataset_path, self.selected_index)
-        
+
         # 确认删除操作
         from PyQt5.QtWidgets import QMessageBox
-        reply = QMessageBox.question(self, "确认删除", 
-                                   f"确定要删除编号 '{self.selected_index}' 及其所有数据吗？此操作不可撤销！",
-                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        
+        reply = QMessageBox.question(self, "确认删除",
+                                     f"确定要删除编号 '{self.selected_index}' 及其所有数据吗？此操作不可撤销！",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
         if reply == QMessageBox.Yes:
             try:
                 # 删除文件夹及其内容
                 import shutil
                 shutil.rmtree(index_path)
-                
+
                 # 更新界面
                 self.load_index_list()
                 self.info_text_edit.clear()
                 self.save_info_button.setEnabled(False)
-                
+
                 # 显示删除成功消息
                 QMessageBox.information(self, "删除成功", f"编号 '{self.selected_index}' 已成功删除")
             except Exception as e:
@@ -802,7 +803,7 @@ class MainWindow(QMainWindow):
             try:
                 # 保存当前选项
                 self.save_options()
-                
+
                 # 获取选中的选项
                 selected_options = []
                 group_options = {}
@@ -812,23 +813,23 @@ class MainWindow(QMainWindow):
                         selected_options.append(option_key)
                         # 获取对应的分组大小
                         group_options[option_key] = self.group_spinboxes[i].value()
-                
+
                 # 获取数据点百分比
                 data_point_percentage = self.data_point_percentage_spinbox.value()
-                
+
                 # 获取选中的模型
                 selected_models = self.get_selected_models()
                 # 如果没有选择任何模型，则默认选择所有模型
                 if not selected_models:
                     self.select_all_models()
                     selected_models = self.get_selected_models()
-                
+
                 # 使用更新后的Draw类
                 drawer = Draw(selected_options, group_options, data_point_percentage, selected_models)
                 drawer.run(self.selected_dataset, self.selected_index)
             except Exception as e:
                 print(f"绘图时出错: {e}")
-                
+
     def reset_group_sizes(self):
         """将所有分组大小重置为1"""
         for spinbox in self.group_spinboxes:
@@ -843,49 +844,49 @@ class MainWindow(QMainWindow):
                 'checked': checkbox.isChecked(),
                 'group_size': spinbox.value()
             })
-            
+
         # 保存数据点百分比
         options_state.append({
             'key': 'data_point_percentage',
             'value': self.data_point_percentage_spinbox.value()
         })
-        
+
         # 保存选中的数据集、编号和模型
         options_state.append({
             'key': 'selected_dataset',
             'value': self.selected_dataset
         })
-        
+
         options_state.append({
             'key': 'selected_index',
             'value': self.selected_index
         })
-        
+
         # 保存选中的模型
         selected_models = self.get_selected_models()
         options_state.append({
             'key': 'selected_models',
             'value': selected_models
         })
-            
+
         try:
             # 确保配置目录存在
             config_dir = './config'
             if not os.path.exists(config_dir):
                 os.makedirs(config_dir)
-                
+
             with open('./config/gui_options.json', 'w') as f:
                 json.dump(options_state, f)
         except Exception as e:
             print(f"保存选项时出错: {e}")
-            
+
     def load_options(self):
         """从文件加载选项"""
         try:
             if os.path.exists('./config/gui_options.json'):
                 with open('./config/gui_options.json', 'r') as f:
                     options_state = json.load(f)
-                    
+
                 # 应用保存的选项
                 for saved_option in options_state:
                     # 处理常规选项
@@ -907,14 +908,14 @@ class MainWindow(QMainWindow):
                     # 处理选中的模型
                     elif saved_option['key'] == 'selected_models':
                         self.last_selected_models = saved_option['value']
-                
+
                 # 如果有保存的选中数据集，尝试选中它
                 if self.selected_dataset:
                     items = self.dataset_list.findItems(self.selected_dataset, Qt.MatchExactly)
                     if items:
                         self.dataset_list.setCurrentItem(items[0])
                         self.load_index_list()
-                        
+
                         # 如果有保存的选中编号，尝试选中它
                         if self.selected_index:
                             index_items = self.index_list.findItems(self.selected_index, Qt.MatchExactly)
@@ -922,7 +923,7 @@ class MainWindow(QMainWindow):
                                 self.index_list.setCurrentItem(index_items[0])
                                 self.load_info_txt()
                                 self.load_model_list()
-                                
+
                                 # 如果有保存的选中模型，尝试选中它们
                                 if hasattr(self, 'last_selected_models') and self.last_selected_models:
                                     for i in range(self.model_list.count()):
@@ -935,7 +936,7 @@ class MainWindow(QMainWindow):
     def toggle_multiselect(self):
         """切换多选模式"""
         self.multiselect_mode = not self.multiselect_mode
-        
+
         if self.multiselect_mode:
             self.index_list.setSelectionMode(QListWidget.MultiSelection)
             self.toggle_multiselect_button.setText("禁用多选")
@@ -944,7 +945,7 @@ class MainWindow(QMainWindow):
             self.toggle_multiselect_button.setText("启用多选")
             # 清除现有选择
             self.index_list.clearSelection()
-            
+
         # 重置选择状态
         self.selected_index = None
         self.draw_button.setEnabled(False)
