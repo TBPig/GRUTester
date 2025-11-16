@@ -1,5 +1,4 @@
-// 进入环境
-conda activate torch_env
+// 进入环境         conda activate torch_env
 
 // 开始任务
 bsub \
@@ -8,7 +7,7 @@ bsub \
   -gpu "num=2" \
   -R "rusage[mem=4GB]" \
   -o task_output.txt \
-  "python main.py --test MNIST --epochs 40 --group 2"
+  "python main.py --test MNIST --group 2"
 
 bsub \
   -n 1 \
@@ -16,14 +15,7 @@ bsub \
   -gpu "num=2" \
   -R "rusage[mem=4GB]" \
   -o task_output.txt \
-  "python main.py --test PTB --epochs 2 --group 0"
+  "python main.py --test PTB --group 0"
 
-// 查看任务
-bjobs
+// 查看任务         bjobs
 
-
-// 任务：
-细调hidden_size
-调整weight_decay
-测试CNN验证
-在测一次2层和3层

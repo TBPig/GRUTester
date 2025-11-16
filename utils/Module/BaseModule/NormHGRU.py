@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from utils.MLP import mlp
+from utils.Module.BaseModule import mlp
 from .BaseGRU import BaseGRU
 
 
@@ -9,6 +9,7 @@ class NormHGRU(BaseGRU):
         self.mpl_n = mpl_n
         self.mpl_h = mpl_h
         super(NormHGRU, self).__init__(input_size, hidden_size, num_layers, dropout)
+        self.name = "NormHGRU"
 
     def _create_gru_cell(self, input_size, hidden_size):
         """创建单个NormHGRU单元"""

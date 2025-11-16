@@ -6,6 +6,7 @@ from .BaseGRU import BaseGRU
 class LocalGRU(BaseGRU):
     def __init__(self, input_size, hidden_size, num_layers=1, dropout=0.0):
         super(LocalGRU, self).__init__(input_size, hidden_size, num_layers, dropout)
+        self.name = "LocalGRU"
 
     def _create_gru_cell(self, input_size, hidden_size):
         """创建单个GRU单元"""

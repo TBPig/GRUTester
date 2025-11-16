@@ -23,8 +23,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-from utils.Comparator.Basic import BasicComparator, BasicModule, Saver
-from utils.Comparator import module
+from utils.Comparator.BasicComparator import BasicComparator
+from utils.Module.PTBModule import TorchGRU
+from utils.Tester import BasicTester, Result
 
 
 # --- 1. 数据加载与预处理 ---
@@ -140,72 +141,6 @@ class PTBDataset(Dataset):
         return torch.tensor(inputs, dtype=torch.long), torch.tensor(targets, dtype=torch.long)
 
 
-class PTBModule(BasicModule):
-    def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int,num_layers=1, dropout=0.0):
-        super().__init__()
-        self.name = name
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.gru = None
-        # 只有当dropout大于0时才创建dropout层
-        self.dropout = nn.Dropout(dropout) if dropout > 0.0 else None
-        self.fc = nn.Linear(hidden_dim, vocab_size)
-
-        init_range = 0.1
-        nn.init.uniform_(self.embedding.weight, -init_range, init_range)
-        nn.init.uniform_(self.fc.weight, -init_range, init_range)
-        nn.init.zeros_(self.fc.bias)
-
-    def forward(self, x, hidden):
-        if self.gru is None:
-            raise NotImplementedError("请先选择gru模型")
-
-        x = self.embedding(x)
-        # 只有当dropout_layer存在时才应用dropout
-        if self.dropout is not None:
-            x = self.dropout(x)
-        outputs, _ = self.gru(x, hidden)
-        decoded = self.fc(outputs)
-        return decoded, hidden
-
-    def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_dim},num_layers={self.num_layers}"
-
-
-class TorchGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.0):
-        super().__init__("TorchGRU", vocab_size, embedding_dim, hidden_dim, num_layers, dropout)
-        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True)
-
-
-class GRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, num_layers=1, dropout=0.0):
-        super().__init__("LocalGRU", vocab_size, embedding_dim, hidden_dim, num_layers, dropout)
-        self.gru = module.LocalGRU(embedding_dim, hidden_dim)
-
-
-class HGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, num_layers=1, dropout=0.0):
-        super().__init__("HGRU", vocab_size, embedding_dim, hidden_dim, num_layers, dropout)
-        self.mpl_h = mpl_h
-        self.gru = module.HGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
-
-    def get_info(self):
-        return super().get_info() + f",MPL=[2,{self.mpl_h}]"
-
-
-class NormHGRU(PTBModule):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim: int, mpl_h=144, num_layers=1, dropout=0.0):
-        super().__init__("normHGRU", vocab_size, embedding_dim, hidden_dim, num_layers, dropout)
-        self.mpl_h = mpl_h
-        self.gru = module.NormHGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
-
-    def get_info(self):
-        return super().get_info() + f",MPL=[2,{self.mpl_h}]"
-
-
 def evaluate(model, data_loader, criterion, device):
     """评估模型"""
     model.eval()  # 设置为评估模式
@@ -278,6 +213,9 @@ def train(model, train_loader, criterion, optimizer, device):
 
 class PTBComparer(BasicComparator):
 
+    def add_tester(self, model) -> BasicTester:
+        pass
+
     def __init__(self):
         super().__init__()
         self.data_name = "PTB"
@@ -299,9 +237,9 @@ class PTBComparer(BasicComparator):
 
     def choice(self, idx):
         if idx == 0:
-            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=2 ,dropout=self.dropout))
-            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=3 ,dropout=self.dropout))
-            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=4 ,dropout=self.dropout))
+            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=2, dropout=self.dropout))
+            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=3, dropout=self.dropout))
+            self.add_tester(TorchGRU(self.vocab_size, self.embedding_dim, 1024, num_layers=4, dropout=self.dropout))
 
 
     def _train_module(self, tester):
@@ -318,7 +256,7 @@ class PTBComparer(BasicComparator):
         )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch_num, eta_min=1e-6)
 
-        cs = Saver()
+        cs = Result()
         for i in range(epoch_num):
             train_loss, train_ppl = train(module, self.train_loader, criterion, optimizer, self.device)
             test_loss, test_ppl, cr = evaluate(module, self.test_loader, criterion, self.device)
@@ -329,4 +267,3 @@ class PTBComparer(BasicComparator):
                               test_loss=test_loss,
                               test_acc=cr,
                               learning_rate=current_lr)
-        self.save_data(cs, module.name)
