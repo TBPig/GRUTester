@@ -29,7 +29,6 @@ class BasicComparator(ABC):
         self.data_name = "Basic"
         self.goal = ""
         self.id = time.strftime("%Y%m%d-%H%M%S")
-        self.result_path = f'result/{self.data_name}/{self.id}'
 
         self.tester_list: list[BasicTester] = []
         self.tester_info: list[dict[str, str]] = []
@@ -38,13 +37,14 @@ class BasicComparator(ABC):
     def run(self):
         self._resolve_duplicate_names()
         self.info["测试目的"] = self.goal
+        result_path = f'result/{self.data_name}/{self.id}'
 
         for tester in tqdm(self.tester_list, desc="Module List"):
             tester.run()
-            tester.save_result(self.result_path)
+            tester.save_result(result_path)
             self.tester_info.append(tester.get_info())
 
-        save_txt(self.info, self.tester_info, self.result_path)
+        save_txt(self.info, self.tester_info, result_path)
 
     def _resolve_duplicate_names(self):
         """

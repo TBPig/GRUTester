@@ -26,7 +26,7 @@ class MNISTFinder:
 
     def run(self):
         dimensions = [
-            Integer(40, 100, name='epochs'),
+            Integer(1, 3, name='epochs'),
             Integer(512, 10240, name='hidden'),
             Integer(1, 10, name='layers')
         ]
@@ -45,31 +45,39 @@ class MNISTFinder:
         # 贝叶斯优化主循环
         for i in range(50):
             next_params = optimizer.ask()
-            score = self.try_module(epochs=int(next_params[0]),
-                                    hidden=int(next_params[1]),
-                                    layers=int(next_params[2]))
-            optimizer.tell(next_params, score)
-
             print(f"第{i + 1}次迭代: epochs={int(next_params[0])}, "
                   f"hidden={int(next_params[1])}, layers={int(next_params[2])}, "
-                  f"loss={score}")
+                  , end="")
+            loss = self.try_module(epochs=int(next_params[0]),
+                                    hidden=int(next_params[1]),
+                                    layers=int(next_params[2]))
+            print(f"loss={loss:.6f}")
+            optimizer.tell(next_params, loss)
 
             self.number += 1
 
         save_txt(self.info, self.tester_info, self.result_path)
 
     def try_module(self, epochs=10, hidden=640, layers=1):
-        tester = MNISTTester(
-            module=TorchGRU(hidden, layers),
-            epochs=epochs,
-        )
-        tester.name += f"-{self.number}"
-        tester.build()
+        try:
+            tester = MNISTTester(
+                module=TorchGRU(hidden, layers),
+                epochs=epochs,
+                # 根据层数动态调整batch_size以防止内存溢出
+                batch_size=max(50, 200 // layers)
+            )
+            tester.name += f"-{self.number:03d}"
+            tester.build()
 
-        tester.run()
-        tester.save_result(self.result_path)
-        self.tester_info.append(tester.get_info())
+            tester.run()
+            tester.save_result(self.result_path)
+            self.tester_info.append(tester.get_info())
 
-        # 返回测试损失值作为评分标准（越低越好）
-        score = tester.final_loss
-        return score
+            # 返回测试损失值作为评分标准（越低越好）
+            score = tester.final_loss
+            del tester
+            return score
+        except Exception as e:
+            # 如果出现内存不足等错误，返回一个较大的损失值
+            print(f"出现错误: {e}")
+            return 114.514  # 返回一个较大的损失值表示这次试验失败

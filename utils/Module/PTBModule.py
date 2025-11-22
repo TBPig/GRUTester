@@ -7,8 +7,11 @@ class PTBModule(nn.Module):
     def __init__(self, name, vocab_size: int, embedding_dim: int, hidden_dim: int, num_layers=1, dropout=0.0):
         super().__init__()
         self.name = name
+        self.vocab_size = vocab_size
+        self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.dropout_p = dropout
 
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.gru = None
@@ -21,7 +24,7 @@ class PTBModule(nn.Module):
         nn.init.uniform_(self.fc.weight, -init_range, init_range)
         nn.init.zeros_(self.fc.bias)
 
-    def forward(self, x, hidden):
+    def forward(self, x, hidden=None):
         if self.gru is None:
             raise NotImplementedError("请先选择gru模型")
 
@@ -29,12 +32,16 @@ class PTBModule(nn.Module):
         # 只有当dropout_layer存在时才应用dropout
         if self.dropout is not None:
             x = self.dropout(x)
-        outputs, _ = self.gru(x, hidden)
+        outputs, hidden = self.gru(x, hidden)
         decoded = self.fc(outputs)
         return decoded, hidden
 
     def get_info(self):
-        return f"模型{self.name}:hidden_size={self.hidden_dim},num_layers={self.num_layers}"
+        base_info = f"模型={self.name}| vocab_size={self.vocab_size}| embedding_dim={self.embedding_dim}"
+        base_info += f"| hidden_dim={self.hidden_dim}| num_layers={self.num_layers}"
+        if self.dropout_p > 0:
+            base_info += f"| dropout={self.dropout_p}"
+        return base_info
 
 
 class TorchGRU(PTBModule):
@@ -56,7 +63,9 @@ class HGRU(PTBModule):
         self.gru = BaseModule.HGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
 
     def get_info(self):
-        return super().get_info() + f",MPL=[2,{self.mpl_h}]"
+        base_info = super().get_info()
+        base_info += f"| mlp=[2,{self.mpl_h}]"
+        return base_info
 
 
 class NormHGRU(PTBModule):
@@ -66,4 +75,6 @@ class NormHGRU(PTBModule):
         self.gru = BaseModule.NormHGRU(embedding_dim, hidden_dim, mpl_n=2, mpl_h=mpl_h)
 
     def get_info(self):
-        return super().get_info() + f",MPL=[2,{self.mpl_h}]"
+        base_info = super().get_info()
+        base_info += f"| mlp=[2,{self.mpl_h}]"
+        return base_info

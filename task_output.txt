@@ -1,0 +1,77 @@
+Sender: LSF System <lsfadmin@gpu02>
+Subject: Job 287888: <python main.py --test MNIST --find> in cluster <cluster_lsf> Exited
+
+Job <python main.py --test MNIST --find> was submitted from host <mgtgpu02> by user <panrenkai> in cluster <cluster_lsf> at Sun Nov 16 23:09:19 2025
+Job was executed on host(s) <gpu02>, in queue <gpu>, as user <panrenkai> in cluster <cluster_lsf> at Sun Nov 16 23:09:19 2025
+</nfsshare/home/panrenkai> was used as the home directory.
+</nfsshare/home/panrenkai> was used as the working directory.
+Started at Sun Nov 16 23:09:19 2025
+Terminated at Mon Nov 17 18:44:04 2025
+Results reported at Mon Nov 17 18:44:04 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python main.py --test MNIST --find
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   71125.28 sec.
+    Max Memory :                                 1133 MB
+    Average Memory :                             666.11 MB
+    Total Requested Memory :                     4096.00 MB
+    Delta Memory :                               2963.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                47
+    Run time :                                   70485 sec.
+    Turnaround time :                            70485 sec.
+
+The output (if any) follows:
+
+cuda:True
+第1次迭代: epochs=88, hidden=2296, layers=8, loss=0.027063088293070903
+第2次迭代: epochs=76, hidden=4849, layers=2, loss=0.02840428094631477
+第3次迭代: epochs=68, hidden=3758, layers=2, loss=0.02835904351940485
+第4次迭代: epochs=79, hidden=1061, layers=7, loss=0.025828613729436255
+第5次迭代: epochs=96, hidden=520, layers=10, loss=0.03280897515183824
+第6次迭代: epochs=77, hidden=6462, layers=1, loss=0.028803357184828543
+Traceback (most recent call last):
+  File "/nfsshare/home/panrenkai/main.py", line 44, in <module>
+    main()
+  File "/nfsshare/home/panrenkai/main.py", line 30, in main
+    f.run()
+  File "/nfsshare/home/panrenkai/utils/Finder/MNISTFinder.py", line 47, in run
+    score = self.try_module(epochs=int(next_params[0]),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nfsshare/home/panrenkai/utils/Finder/MNISTFinder.py", line 68, in try_module
+    tester.run()
+  File "/nfsshare/home/panrenkai/utils/Tester/MNISTTester.py", line 40, in run
+    train_loss = self._train()
+                 ^^^^^^^^^^^^^
+  File "/nfsshare/home/panrenkai/utils/Tester/MNISTTester.py", line 63, in _train
+    predicts = self.module(images)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/nfsshare/home/panrenkai/miniconda3/envs/torch_env/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nfsshare/home/panrenkai/miniconda3/envs/torch_env/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nfsshare/home/panrenkai/utils/Module/MNISTModule.py", line 34, in forward
+    gru_out, hidden = self.gru(x)
+                      ^^^^^^^^^^^
+  File "/nfsshare/home/panrenkai/miniconda3/envs/torch_env/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nfsshare/home/panrenkai/miniconda3/envs/torch_env/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nfsshare/home/panrenkai/miniconda3/envs/torch_env/lib/python3.11/site-packages/torch/nn/modules/rnn.py", line 1139, in forward
+    result = _VF.gru(input, hx, self._flat_weights, self.bias, self.num_layers,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.99 GiB. GPU 0 has a total capacity of 31.74 GiB of which 89.12 MiB is free. Including non-PyTorch memory, this process has 31.65 GiB memory in use. Of the allocated memory 28.92 GiB is allocated by PyTorch, and 2.35 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

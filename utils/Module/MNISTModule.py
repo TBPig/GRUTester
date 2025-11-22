@@ -35,6 +35,8 @@ class MNISTModule(nn.Module):
         if self.dropout is not None:
             gru_out = self.dropout(gru_out)
         outputs = self.fc(gru_out)
+        # 清理中间变量
+        del x, gru_out, hidden
         return outputs[:, -1, :]
 
     def get_info(self):

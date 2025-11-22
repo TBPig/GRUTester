@@ -1,6 +1,6 @@
 import time
 
-from torch import no_grad
+from torch import no_grad, cuda
 from torch import max as torch_max
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
@@ -50,6 +50,8 @@ class MNISTTester(BasicTester):
                                        learning_rate=current_lr)
             self.final_loss = test_loss
         self.consume_time = time.perf_counter() - t
+        # 训练结束后清理缓存
+        cuda.empty_cache()
 
     def _train(self):
         """执行一次训练步骤"""
@@ -67,7 +69,12 @@ class MNISTTester(BasicTester):
             self.optimizer.step()
 
             loss_sum += loss.item()
+            
+            # 每批次后清理缓存以释放内存
+            del images, labels, predicts, loss
 
+        # 在训练结束时清理缓存
+        cuda.empty_cache()
         return loss_sum / len(self.train_loader)
 
     def _test(self):
@@ -86,7 +93,12 @@ class MNISTTester(BasicTester):
 
                 loss_sum += loss.item()
                 correct += (predict_labels == labels).sum().item()
+                
+                # 每批次后清理变量
+                del images, labels, predicts, loss, predict_labels
 
             correct_rate = correct / len(self.test_dataset)
             loss = loss_sum / len(self.test_loader)
+            # 测试完成后清理缓存
+            cuda.empty_cache()
             return correct_rate, loss
